@@ -1,755 +1,283 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>LMS Algoritma Pemrograman</title>
-<!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-<style>
-:root {
-  --bg: #080c14;
-  --card: #121824;
-  --card-hover: #182030;
-  --tx: #f1f5f9;
-  --mu: #94a3b8;
-  --ac: #00f2fe;
-  --ac-grad: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
-  --ac-glow: rgba(0, 242, 254, 0.25);
-  --sec-grad: linear-gradient(135deg, #7f00ff 0%, #e100ff 100%);
-  --ok: #00e676;
-  --bad: #ff2a6d;
-  --bd: #1e293b;
-  box-sizing: border-box;
-  padding-top: env(safe-area-inset-top, 0px);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  color-scheme: dark;
-}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stock SNA DSS Dashboard</title>
+  
+  <!-- Bootstrap 5 CSS (Dark Theme Accent) -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Vis-Network CSS -->
+  <link href="https://unpkg.com/vis-network/standalone/umd/vis-network.min.css" rel="stylesheet" type="text/css" />
 
-*, *::before, *::after { box-sizing: inherit; }
-
-html {
-  scroll-padding-top: env(safe-area-inset-top, 0px);
-  background: var(--bg);
-}
-
-body {
-  margin: 0;
-  background: var(--bg);
-  background-image: 
-    radial-gradient(circle at 15% 15%, rgba(127, 0, 255, 0.08) 0%, transparent 40%),
-    radial-gradient(circle at 85% 85%, rgba(0, 242, 254, 0.08) 0%, transparent 40%);
-  background-attachment: fixed;
-  color: var(--tx);
-  font: 16px/1.6 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-  min-height: 100vh;
-}
-
-#app {
-  max-width: 680px;
-  margin: 0 auto;
-  padding: 24px 16px;
-}
-
-a {
-  color: var(--ac);
-  text-decoration: none;
-  transition: all 0.2s;
-}
-
-a:hover {
-  text-shadow: 0 0 8px var(--ac-glow);
-}
-
-h1 {
-  font-size: 1.75rem;
-  font-weight: 800;
-  line-height: 1.25;
-  margin: 0.5em 0 0.2em;
-  letter-spacing: -0.02em;
-  background: linear-gradient(135deg, #fff 30%, var(--ac) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-h2 {
-  font-size: 1.2rem;
-  font-weight: 700;
-  line-height: 1.35;
-  margin: 0.2em 0 0.5em;
-  color: #fff;
-}
-
-.card {
-  background: var(--card);
-  border: 1px solid var(--bd);
-  border-radius: 16px;
-  padding: 18px 20px;
-  margin: 14px 0;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.card:hover {
-  border-color: rgba(0, 242, 254, 0.3);
-}
-
-.mu {
-  color: var(--mu);
-  font-size: 0.9rem;
-}
-
-.bar {
-  height: 10px;
-  background: #0f172a;
-  border-radius: 99px;
-  overflow: hidden;
-  border: 1px solid var(--bd);
-  padding: 2px;
-}
-
-.bar i {
-  display: block;
-  height: 100%;
-  background: var(--ac-grad);
-  border-radius: 99px;
-  box-shadow: 0 0 10px var(--ac);
-  transition: width 0.4s ease;
-}
-
-a.btn, button {
-  font-family: inherit;
-  font-size: 0.95rem;
-  background: var(--ac-grad);
-  color: #080c14;
-  border: 0;
-  border-radius: 12px;
-  padding: 12px 20px;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  margin: 6px 8px 6px 0;
-  font-weight: 700;
-  box-shadow: 0 4px 15px var(--ac-glow);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
-}
-
-a.btn:hover, button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 242, 254, 0.4);
-}
-
-a.btn:active, button:active {
-  transform: translateY(1px);
-}
-
-button.alt, a.btn.alt {
-  background: rgba(18, 24, 36, 0.8);
-  color: var(--ac);
-  border: 1.5px solid var(--ac);
-  box-shadow: none;
-}
-
-button.alt:hover, a.btn.alt:hover {
-  background: rgba(0, 242, 254, 0.1);
-  box-shadow: 0 0 15px var(--ac-glow);
-}
-
-button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  transform: none !important;
-  box-shadow: none !important;
-}
-
-:focus-visible {
-  outline: 2px solid var(--ac);
-  outline-offset: 3px;
-}
-
-.flow {
-  position: relative;
-  padding-left: 54px;
-  margin-top: 20px;
-}
-
-.flow::before {
-  content: "";
-  position: absolute;
-  left: 21px;
-  top: 10px;
-  bottom: 10px;
-  border-left: 2px dashed var(--bd);
-}
-
-.step {
-  position: relative;
-  display: block;
-  color: inherit;
-  text-decoration: none;
-  margin: 16px 0;
-}
-
-.step .num {
-  position: absolute;
-  left: -54px;
-  top: 16px;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: var(--card);
-  color: var(--ac);
-  border: 2px solid var(--ac);
-  display: grid;
-  place-items: center;
-  font-weight: 800;
-  box-shadow: 0 0 12px var(--ac-glow);
-  z-index: 1;
-}
-
-.step.lock {
-  opacity: 0.5;
-}
-
-.step.lock .num {
-  background: var(--bg);
-  color: var(--mu);
-  border: 2px dashed var(--mu);
-  box-shadow: none;
-}
-
-.step.pass .num {
-  background: var(--ok);
-  color: #080c14;
-  border-color: var(--ok);
-  box-shadow: 0 0 12px rgba(0, 230, 118, 0.4);
-}
-
-.ok { color: var(--ok); font-weight: 700; }
-.bad { color: var(--bad); font-weight: 700; }
-
-pre {
-  background: #0d131f;
-  border: 1px solid var(--bd);
-  border-radius: 12px;
-  padding: 14px;
-  overflow-x: auto;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.88rem;
-  line-height: 1.5;
-  color: #a5b4fc;
-}
-
-input[type=text], input[type=password] {
-  font-family: inherit;
-  font-size: 1rem;
-  width: 100%;
-  padding: 12px 16px;
-  margin: 6px 0 16px;
-  border: 1.5px solid var(--bd);
-  border-radius: 12px;
-  background: #0d131f;
-  color: var(--tx);
-  transition: border-color 0.2s;
-}
-
-input[type=text]:focus, input[type=password]:focus {
-  outline: none;
-  border-color: var(--ac);
-  box-shadow: 0 0 10px var(--ac-glow);
-}
-
-.opt {
-  display: block;
-  width: 100%;
-  text-align: left;
-  background: #0d131f;
-  color: var(--tx);
-  border: 1.5px solid var(--bd);
-  border-radius: 12px;
-  margin: 10px 0;
-  padding: 14px 16px;
-  font-weight: 500;
-  box-shadow: none;
-}
-
-.opt:hover {
-  border-color: var(--mu);
-  background: #121a29;
-}
-
-.opt.on {
-  border-color: var(--ac);
-  background: rgba(0, 242, 254, 0.08);
-  box-shadow: 0 0 12px var(--ac-glow);
-  color: #fff;
-}
-
-.kartu {
-  background: linear-gradient(180deg, var(--card) 0%, #0d131f 100%);
-  border: 2px solid var(--ac);
-  text-align: center;
-  padding: 24px 20px;
-  box-shadow: 0 0 30px var(--ac-glow);
-}
-
-.skor {
-  font-size: 3.8rem;
-  font-weight: 800;
-  line-height: 1.1;
-  margin: 10px 0;
-  letter-spacing: -0.03em;
-}
-
-.kode {
-  font-family: 'JetBrains Mono', monospace;
-  font-weight: 700;
-  font-size: 1.15rem;
-  letter-spacing: 0.12em;
-}
-
-table.k {
-  width: 100%;
-  margin-top: 14px;
-  text-align: left;
-  font-size: 0.95rem;
-  border-collapse: collapse;
-}
-
-table.k td {
-  padding: 8px 0;
-  border-top: 1px solid var(--bd);
-}
-
-table.k td:last-child {
-  text-align: right;
-  font-weight: 600;
-}
-
-.board {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(var(--c), 1fr);
-  grid-template-rows: repeat(var(--r), 1fr);
-  width: 100%;
-  border-radius: 16px;
-  overflow: hidden;
-  border: 2px solid var(--ac);
-  margin: 14px 0;
-  box-shadow: 0 0 20px var(--ac-glow);
-  background: #0d131f;
-}
-
-.board i {
-  background: rgba(18, 24, 36, 0.6);
-  box-shadow: inset 0 0 0 1px var(--bd);
-  display: grid;
-  place-items: center;
-  font-style: normal;
-  font-size: clamp(18px, 6vw, 32px);
-}
-
-.board i.wl {
-  background: #1e293b;
-  background-image: repeating-linear-gradient(45deg, #0f172a 0, #0f172a 10px, #1e293b 10px, #1e293b 20px);
-}
-
-.rob {
-  position: absolute;
-  left: 0;
-  top: 0;
-  transition: left 0.3s, top 0.3s;
-  display: grid;
-  place-items: center;
-  font-size: clamp(20px, 7vw, 36px);
-  filter: drop-shadow(0 0 8px var(--ac));
-}
-
-.rob u {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  text-decoration: none;
-  color: var(--ac);
-  font-size: 0.5em;
-  transition: transform 0.3s;
-}
-
-.rob u::before { content: "▲"; }
-
-.tok {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 8px 14px;
-  margin: 6px 0;
-  background: #0d131f;
-  color: var(--tx);
-  border: 1px solid var(--bd);
-  border-radius: 8px;
-  font-family: 'JetBrains Mono', monospace;
-  font-weight: 500;
-  box-shadow: none;
-}
-
-.tok:hover {
-  border-color: var(--bad);
-  color: var(--bad);
-}
-
-#pal button {
-  margin: 4px 6px 4px 0;
-  padding: 8px 14px;
-  font-size: 0.85rem;
-  font-family: 'JetBrains Mono', monospace;
-}
-
-.lv {
-  display: block;
-  position: relative;
-  padding-left: 70px;
-  color: inherit;
-  text-decoration: none;
-}
-
-.lv .num {
-  position: absolute;
-  left: 16px;
-  top: 16px;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: var(--ac-grad);
-  color: #080c14;
-  display: grid;
-  place-items: center;
-  font-weight: 800;
-  box-shadow: 0 0 10px var(--ac-glow);
-}
-
-.lv.lock {
-  opacity: 0.5;
-}
-
-.lv.lock .num {
-  background: var(--bg);
-  color: var(--mu);
-  border: 2px dashed var(--mu);
-  box-shadow: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .rob, .rob u { transition: none; }
-}
-
-select{font-family:inherit;font-size:.95rem;padding:10px 12px;border:1.5px solid var(--bd);border-radius:12px;background:#0d131f;color:var(--tx);max-width:100%}
-table.g{width:100%;border-collapse:collapse;font-size:.88rem;white-space:nowrap}
-table.g th{text-align:left;color:var(--mu);font-weight:600;padding:8px 10px}
-table.g td{padding:8px 10px;border-top:1px solid var(--bd);vertical-align:top}
-table.g td:nth-child(n+4){text-align:center}
-table.g th:nth-child(n+4){text-align:center}
-.chip{display:inline-block;padding:0 8px;margin:1px 3px 1px 0;border:1px solid var(--bd);border-radius:99px;font-family:'JetBrains Mono',monospace;font-size:.75rem;color:var(--ac)}
-</style>
+  <style>
+    body {
+      background-color: #121212;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .card-dark {
+      background-color: #1e1e1e;
+      border: 1px solid #2d2d2d;
+      border-radius: 12px;
+    }
+    #network-graph {
+      width: 100%;
+      height: 480px;
+      background-color: #181818;
+      border-radius: 8px;
+    }
+    .badge-lagging {
+      background-color: #ffc107;
+      color: #000;
+      font-weight: 600;
+    }
+    .badge-momentum {
+      background-color: #198754;
+      color: #fff;
+      font-weight: 600;
+    }
+    .badge-neutral {
+      background-color: #6c757d;
+      color: #fff;
+    }
+    .table-dark-custom {
+      --bs-table-bg: #1e1e1e;
+      --bs-table-border-color: #2d2d2d;
+      color: #e0e0e0;
+    }
+  </style>
 </head>
-<body>
-<div id="app"></div>
-<script>
-const PASS=70;
-const SB='https://hihfnbnlhkkmxkrkknpv.supabase.co';
-const KEY='sb_publishable_TMWv8pAbDpkUel8StVSBoQ_ZGerMesa';
-const DOM='@siswa.example.com'; // harus sama dengan DOMAIN di buat_akun.mjs
-const SK='lms_sesi';
-let SES=null;try{SES=JSON.parse(localStorage.getItem(SK))}catch(e){}
-const keep=()=>{try{SES?localStorage.setItem(SK,JSON.stringify(SES)):localStorage.removeItem(SK)}catch(e){}};
-const setSes=j=>{SES={access_token:j.access_token,refresh_token:j.refresh_token,exp:Date.now()+(j.expires_in-30)*1000};keep()};
-async function raw(path,opt={},tok){
-  const r=await fetch(SB+path,{...opt,headers:{apikey:KEY,'Content-Type':'application/json',...(tok?{Authorization:'Bearer '+tok}:{}),...(opt.headers||{})}});
-  const t=await r.text();let j;try{j=JSON.parse(t)}catch(e){j=t}
-  if(!r.ok){const e=new Error((j&&(j.message||j.msg||j.error_description||j.error))||'Tidak dapat terhubung ke server');e.status=r.status;throw e}
-  return j;
-}
-async function refresh(){
-  try{setSes(await raw('/auth/v1/token?grant_type=refresh_token',{method:'POST',body:JSON.stringify({refresh_token:SES.refresh_token})}))}
-  catch(e){if(e.status&&e.status<500){SES=null;keep()}const x=new Error('Sesi berakhir, silakan masuk lagi.');x.status=401;throw x}
-}
-async function api(path,opt){
-  if(!SES){const x=new Error('Belum masuk');x.status=401;throw x}
-  if(Date.now()>SES.exp)await refresh();
-  try{return await raw(path,opt,SES.access_token)}
-  catch(e){if(e.status===401){await refresh();return raw(path,opt,SES.access_token)}throw e}
-}
-const rpc=(fn,args={})=>api('/rest/v1/rpc/'+fn,{method:'POST',body:JSON.stringify(args)});
-const M=[
-{id:'m1',t:'Konsep Algoritma',d:'Algoritma, flowchart, pseudocode',
- s:[{h:'Apa itu algoritma?',b:`<p>Algoritma adalah urutan langkah yang jelas dan berhingga untuk menyelesaikan suatu masalah. Contohnya langkah membuat teh, atau mencari bilangan terbesar dari tiga angka.</p><p>Algoritma yang baik punya input, output, langkah yang tidak ambigu, pasti berhenti, dan efektif.</p>`},
-    {h:'Flowchart dan pseudocode',b:`<p>Flowchart menggambar algoritma dengan simbol: oval untuk mulai/selesai, jajar genjang untuk input/output, persegi untuk proses, belah ketupat untuk keputusan.</p><p>Pseudocode menulis langkah dengan bahasa mirip kode tetapi bebas sintaks:</p><pre>MULAI\n  BACA a, b\n  hasil ← a + b\n  TAMPILKAN hasil\nSELESAI</pre>`}],
- q:[{q:'Ciri algoritma yang benar adalah…',o:['Boleh berjalan tanpa henti','Langkahnya jelas dan berhingga','Tidak membutuhkan input','Harus memakai bahasa Python']},
-    {q:'Simbol belah ketupat pada flowchart berarti…',o:['Mulai','Proses','Keputusan','Output']},
-    {q:'Penulisan langkah dengan bahasa mirip kode tanpa sintaks ketat disebut…',o:['Pseudocode','Compiler','Debugging','Syntax']},
-    {q:'Simbol oval pada flowchart dipakai untuk…',o:['Keputusan','Mulai atau selesai','Perhitungan','Input data']}]},
-{id:'m2',t:'Variabel, Tipe Data, Operator',d:'Wadah nilai dan cara mengolahnya',
- s:[{h:'Variabel dan tipe data',b:`<p>Variabel adalah wadah bernama untuk menyimpan nilai. Tipe data umum: integer (bilangan bulat), float (desimal), string (teks), boolean (benar/salah).</p><pre>umur ← 16\nnama ← "Sari"\nlulus ← benar</pre>`},
-    {h:'Operator',b:`<p>Aritmetika: + − × ÷ dan MOD (sisa bagi). Perbandingan: =, ≠, &lt;, &gt;. Logika: AND, OR, NOT.</p><p>Contoh: 17 MOD 5 menghasilkan 2.</p>`}],
- q:[{q:'Tipe data yang tepat untuk menyimpan 3,14 adalah…',o:['Integer','Float','Boolean','String']},
-    {q:'Hasil dari 17 MOD 5 adalah…',o:['3','2','12','3,4']},
-    {q:'Nilai boolean hanya dapat berupa…',o:['Angka 0 sampai 9','Teks bebas','Benar atau salah','Desimal']},
-    {q:'Operator AND bernilai benar jika…',o:['Salah satu kondisi benar','Kedua kondisi benar','Kedua kondisi salah','Tidak ada kondisi']}]},
-{id:'m3',t:'Percabangan',d:'Memilih langkah dengan if/else',
- s:[{h:'Struktur if/else',b:`<p>Percabangan memilih langkah berdasarkan kondisi.</p><pre>JIKA nilai ≥ 70 MAKA\n  TAMPILKAN "Lulus"\nSELAIN ITU\n  TAMPILKAN "Belum lulus"\nAKHIR JIKA</pre>`},
-    {h:'Percabangan bertingkat',b:`<p>Gunakan SELAIN ITU JIKA untuk beberapa kondisi. Kondisi diperiksa dari atas ke bawah; yang pertama benar dijalankan dan sisanya dilewati.</p>`}],
- q:[{q:'Percabangan dipakai untuk…',o:['Mengulang langkah','Memilih langkah berdasarkan kondisi','Menyimpan data','Menghentikan program']},
-    {q:'Jika nilai = 70, hasil kondisi “nilai > 70” adalah…',o:['Benar','Salah','Error','Tidak tentu']},
-    {q:'Pada if/else bertingkat, kondisi diperiksa…',o:['Dari bawah ke atas','Secara acak','Dari atas sampai ada yang benar','Semuanya sekaligus']},
-    {q:'Bagian yang dijalankan bila semua kondisi salah adalah…',o:['else','if','while','return']}]},
-{id:'m4',t:'Perulangan',d:'for dan while',s:[],q:[]},
-{id:'m5',t:'Array dan Fungsi',d:'Data berurutan dan potongan program',s:[],q:[]},
-{id:'m6',t:'Searching dan Sorting Dasar',d:'Mencari dan mengurutkan data',s:[],q:[]},
-{id:'m7',t:'Rekursi dan Kompleksitas',d:'Fungsi memanggil dirinya sendiri',s:[],q:[]}
-];
-const app=document.getElementById('app');
-let D=null,R=null,Q=null,G=null,RT=0;
-const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const wide=w=>{app.style.maxWidth=w?'1180px':'680px'};
-const has=m=>m.q.length>0;
-const opened=k=>!!(D&&D.buka&&D.buka.includes(k));
-const best=m=>(D&&D.best&&D.best[m.id])??-1;
-const passedPrev=i=>i===0||best(M[i-1])>=PASS;
-const unlocked=i=>i===0||(passedPrev(i)&&opened(M[i].id));
-const lopen=i=>i===0||opened('l'+i);
-const load=async()=>{D=await rpc('lms_data_saya')};
-const sortKelas=(a,b)=>a.kelas.localeCompare(b.kelas,'id',{numeric:true})||a.nama.localeCompare(b.nama,'id');
+<body class="py-4">
 
-async function logout(){
-  try{if(SES)await raw('/auth/v1/logout',{method:'POST'},SES.access_token)}catch(e){}
-  SES=null;D=null;G=null;Q=null;R=null;keep();location.hash='#/';route();
-}
+  <div class="container-fluid px-4">
+    <!-- Top Bar -->
+    <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom border-secondary">
+      <div>
+        <h3 class="fw-bold m-0 text-light">📈 Stock SNA DSS Dashboard</h3>
+        <small class="text-muted">Single-Index Model Lagging Signal Detector ($QQQ Benchmark)</small>
+      </div>
+      <div class="d-flex align-items-center gap-3">
+        <span id="data-status-badge" class="badge bg-warning text-dark px-3 py-2">Simulation Mode (Mock Data)</span>
+        <button id="btn-refresh" class="btn btn-outline-primary btn-sm px-3" onclick="loadDashboardData()">
+          🔄 Refresh Data
+        </button>
+      </div>
+    </div>
 
-function login(msg){
-  wide(false);
-  app.innerHTML=`<h1>Belajar algoritma, selangkah demi selangkah</h1><p class="mu">Masuk dengan username dan kata sandi dari gurumu.</p><div class="card"><form id="lf"><label>Username<input type="text" id="un" autocomplete="username" autocapitalize="none" spellcheck="false"></label><label>Kata sandi<input type="password" id="pw" autocomplete="current-password"></label><p id="er" class="bad" style="margin:0 0 8px">${esc(msg||'')}</p><button type="submit" id="go">Masuk</button></form></div>`;
-  document.getElementById('lf').onsubmit=async e=>{
-    e.preventDefault();
-    const u=un.value.trim(),p=pw.value,er=document.getElementById('er'),bt=document.getElementById('go');
-    if(!u||!p){er.textContent='Isi username dan kata sandi.';return}
-    er.textContent='Memeriksa…';bt.disabled=true;
-    try{
-      const j=await raw('/auth/v1/token?grant_type=password',{method:'POST',body:JSON.stringify({email:u.includes('@')?u:u.toLowerCase()+DOM,password:p})});
-      setSes(j);D=null;route();
-    }catch(x){bt.disabled=false;er.textContent=x.status===400||x.status===401?'Username atau kata sandi salah.':'Tidak dapat terhubung ke server. Coba lagi.'}
-  };
-}
+    <div class="row g-4">
+      <!-- Zona 1: Visual SNA Graph -->
+      <div class="col-lg-7">
+        <div class="card card-dark p-3 h-100">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="m-0 text-light">Zona 1: Radial Correlation Graph</h5>
+            <small class="text-muted">Node hub: QQQ | Edge thickness: Correlation ($r$)</small>
+          </div>
+          <div id="network-graph"></div>
+        </div>
+      </div>
 
-function failed(e){
-  if(!SES)return login(e&&e.status===401?'Sesi berakhir, silakan masuk lagi.':'');
-  wide(false);
-  app.innerHTML=`<h1>Tidak dapat memuat data</h1><div class="card"><p class="bad">${esc(e.message)}</p><button id="rt">Coba lagi</button><button class="alt" id="lo">Keluar</button></div>`;
-  document.getElementById('rt').onclick=route;document.getElementById('lo').onclick=logout;
-}
+      <!-- Zona 2: Tabel Sinyal DSS -->
+      <div class="col-lg-5">
+        <div class="card card-dark p-3 h-100">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="m-0 text-light">Zona 2: DSS Signal Table</h5>
+            <small class="text-muted">QQQ 15m Return: <span id="qqq-return" class="fw-bold text-info">0.00%</span></small>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-dark-custom align-middle">
+              <thead>
+                <tr>
+                  <th>Ticker</th>
+                  <th>Correlation ($r$)</th>
+                  <th>Return 15m</th>
+                  <th>Signal Status</th>
+                </tr>
+              </thead>
+              <tbody id="signal-table-body">
+                <!-- Data diisi oleh JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-function home(){
-  wide(false);
-  const lulus=M.filter(m=>best(m)>=PASS).length;
-  const rapor=M.filter(has).map(m=>{const a=(D.att&&D.att[m.id])||0,b=best(m);return `<tr><td>${m.t}</td><td>${a||'-'}</td><td class="${b>=PASS?'ok':''}">${b<0?'-':b}</td></tr>`}).join('');
-  app.innerHTML=`<h1>Algoritma Pemrograman</h1><p class="mu">Halo, ${esc(D.nama)} (${esc(D.kelas)}). Lulus satu modul, lalu tunggu gurumu membuka modul berikutnya.</p>
-  <div class="card"><div class="mu" style="margin-bottom:6px">${lulus} dari ${M.length} modul lulus</div><div class="bar"><i style="width:${lulus/M.length*100}%"></i></div>
-  <table class="k"><tr><td class="mu">Modul</td><td class="mu" style="font-weight:400">Percobaan</td><td class="mu" style="font-weight:400">Skor terbaik</td></tr>${rapor}</table></div>
-  <a class="card" href="#/lab" style="display:block;color:inherit;text-decoration:none;border:2px solid var(--ac)"><b>🎮 Lab Koding: Robot Penjelajah</b><br><span class="mu">Susun perintah, bawa robot ke bendera. ⭐ ${labStars()} dari ${LV.length*3}</span></a>
-  <div class="flow">`+M.map((m,i)=>{
-    const ok=unlocked(i),h=has(m),b=best(m),wait=h&&!ok&&passedPrev(i);
-    const st=!h?'Segera hadir':wait?'Menunggu gurumu membuka modul ini':!ok?`Terkunci. Lulus modul ${i} (min. ${PASS}) untuk membuka`:b>=PASS?`<span class="ok">Lulus, skor ${b}</span>`:b>=0?`Skor terbaik ${b}, belum lulus`:'Belum dikerjakan';
-    const inner=`<span class="num">${ok&&h?i+1:'🔒'}</span><b>${m.t}</b><br><span class="mu">${m.d}</span><br><span class="mu">${st}</span>`;
-    return ok&&h?`<a class="card step${b>=PASS?' pass':''}" href="#/m/${m.id}">${inner}</a>`:`<div class="card step lock">${inner}</div>`;
-  }).join('')+`</div><p class="mu" style="text-align:center"><a href="#" id="rf" style="color:inherit">↻ Perbarui</a> · <a href="#" id="lo" style="color:inherit">Keluar</a></p>`;
-  document.getElementById('rf').onclick=e=>{e.preventDefault();route()};
-  document.getElementById('lo').onclick=e=>{e.preventDefault();logout()};
-}
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 
-function modul(m){
-  wide(false);
-  const k='lms_done_'+m.id,d=(()=>{try{return JSON.parse(localStorage.getItem(k))||[]}catch(e){return[]}})();
-  app.innerHTML=`<a href="#/">← Beranda</a><h1>${m.t}</h1>`+m.s.map((s,i)=>`<div class="card"><h2>${s.h}</h2>${s.b}<label class="mu"><input type="checkbox" data-i="${i}" ${d[i]?'checked':''} style="margin-right:8px">Tandai selesai</label></div>`).join('')+`<a class="btn" href="#/q/${m.id}">Mulai kuis (min. ${PASS})</a>`;
-  app.querySelectorAll('input[type=checkbox]').forEach(c=>c.onchange=()=>{d[c.dataset.i]=c.checked;try{localStorage.setItem(k,JSON.stringify(d))}catch(e){}});
-}
+  <script>
+    // ==========================================
+    // 1. KONFIGURASI SUPABASE EDGE FUNCTION
+    // ==========================================
+    // Ganti URL ini dengan URL Edge Function Supabase kamu jika sudah terpasang
+    const SUPABASE_FUNCTION_URL = 'https://YOUR_PROJECT_ID.supabase.co/functions/v1/telegram-agent';
 
-function quiz(m){
-  wide(false);
-  if(!Q||Q.id!==m.id)Q={id:m.id,i:0,a:[]};
-  const q=m.q[Q.i],last=Q.i===m.q.length-1;
-  app.innerHTML=`<a href="#/m/${m.id}">← Materi</a><p class="mu" style="margin-bottom:6px">${m.t}, soal ${Q.i+1} dari ${m.q.length}</p><div class="bar"><i style="width:${Q.i/m.q.length*100}%"></i></div><div class="card"><h2>${q.q}</h2>`+q.o.map((o,j)=>`<button class="opt${Q.a[Q.i]===j?' on':''}" data-j="${j}">${o}</button>`).join('')+`</div><button id="nx" ${Q.a[Q.i]===undefined?'disabled':''}>${last?'Selesai':'Lanjut'}</button><p id="qe" class="bad"></p>`;
-  app.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{Q.a[Q.i]=+b.dataset.j;quiz(m)});
-  document.getElementById('nx').onclick=()=>{if(!last){Q.i++;quiz(m);return}finish(m)};
-}
+    let networkInstance = null;
 
-async function finish(m){
-  const bt=document.getElementById('nx');bt.disabled=true;bt.textContent='Menilai…';
-  try{
-    const r=await rpc('lms_kirim_kuis',{p_modul:m.id,p_jawaban:Array.from(Q.a,x=>x===undefined?null:x)});
-    D.att=D.att||{};D.best=D.best||{};D.att[m.id]=r.percobaan;D.best[m.id]=Math.max(best(m),r.skor);
-    const ts=new Date().toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'});
-    R={id:m.id,sk:r.skor,ok:r.benar,n:r.total,att:r.percobaan,ts};
-    Q=null;location.hash='#/r';
-  }catch(e){bt.disabled=false;bt.textContent='Gagal terkirim, ketuk untuk coba lagi';document.getElementById('qe').textContent=e.message}
-}
+    // ==========================================
+    // 2. FALLBACK MOCK DATA (Untuk Uji Visual)
+    // ==========================================
+    function fallbackMockData() {
+      return {
+        is_live: false,
+        qqq_return_15m: 0.45,
+        stocks: [
+          { ticker: 'NVDA', corr: 0.89, return15m: 0.52, price: 128.50 },
+          { ticker: 'AMD',  corr: 0.84, return15m: 0.04, price: 154.20 }, // BUY LAGGING
+          { ticker: 'SMCI', corr: 0.82, return15m: 0.02, price: 45.10 },  // BUY LAGGING
+          { ticker: 'TSM',  corr: 0.78, return15m: 0.38, price: 172.00 },
+          { ticker: 'AAPL', corr: 0.45, return15m: -0.10, price: 224.30 }
+        ]
+      };
+    }
 
-function hasil(){
-  wide(false);
-  if(!R){location.hash='#/';return}
-  const i=M.findIndex(m=>m.id===R.id),m=M[i],p=R.sk>=PASS,nx=M[i+1];
-  const nxt=p&&nx&&has(nx)?(opened(nx.id)?`<a class="btn alt" href="#/m/${nx.id}">Modul berikutnya</a>`:`<p class="mu">Lulus! Modul berikutnya akan dibuka oleh gurumu.</p>`):'';
-  app.innerHTML=`<div class="card kartu"><div class="mu">Kartu hasil, LMS Algoritma</div><h2 style="margin-top:6px">${esc(D.nama)}, ${esc(D.kelas)}</h2><div class="mu">${m.t}</div><div class="skor ${p?'ok':'bad'}">${R.sk}</div><b class="${p?'ok':'bad'}">${p?'Lulus':'Belum lulus'}</b> <span class="mu">(minimum ${PASS})</span><table class="k"><tr><td>Jawaban benar</td><td>${R.ok} dari ${R.n}</td></tr><tr><td>Percobaan ke</td><td>${R.att}</td></tr><tr><td>Waktu</td><td>${R.ts}</td></tr></table></div><p class="mu">Nilaimu sudah tersimpan dan dapat dilihat gurumu.</p>`+nxt+`<a class="btn alt" href="#/q/${m.id}">Coba lagi</a><a class="btn alt" href="#/">Beranda</a>`;
-}
+    // ==========================================
+    // 3. LOGIKA EVALUASI SINYAL (DSS ENGINE)
+    // ==========================================
+    function evaluateSignal(benchReturn, corr, stockReturn) {
+      // Syarat BUY (LAGGING): QQQ > +0.20%, Korelasi >= 0.75, tapi saham belum naik (< +0.10%)
+      if (benchReturn > 0.20 && corr >= 0.75 && stockReturn < 0.10) {
+        return { label: 'BUY LAGGING', badgeClass: 'badge-lagging', color: '#ffc107' };
+      } 
+      else if (stockReturn >= 0.20 && corr >= 0.75) {
+        return { label: 'MOMENTUM', badgeClass: 'badge-momentum', color: '#198754' };
+      } 
+      else {
+        return { label: 'NEUTRAL', badgeClass: 'badge-neutral', color: '#6c757d' };
+      }
+    }
 
-/* ---------- Lab Koding ---------- */
-const TK={F:'⬆ Maju',L:'↺ Putar kiri',R:'↻ Putar kanan',REP2:'🔁 Ulangi 2×',REP3:'🔁 Ulangi 3×',REP4:'🔁 Ulangi 4×',WHILE:'🔁 Selama depan kosong',END:'⏹ Akhir blok'};
-const BASIC=['F','L','R'],LOOPS=['F','L','R','REP2','REP3','REP4','END'];
-const LV=[
-{n:'Langkah pertama',h:'Urutan: robot menjalankan perintah dari atas ke bawah.',g:['S....','.....','....G'],d:2,par:7,ok:BASIC},
-{n:'Tangga',h:'Pola yang berulang bisa dibungkus dengan Ulangi.',g:['S....','.....','.....','.....','....G'],d:1,par:6,ok:LOOPS},
-{n:'Jalan memutar',h:'Tembok menghalangi, jadi robot harus memutar. Cobalah hemat blok.',g:['S.#.G','..#..','..#..','.....','.....'],d:2,par:11,ok:LOOPS},
-{n:'Lorong panjang',h:'Selama: mengulang terus selagi kondisinya benar, tanpa menghitung langkah.',g:['.......','S.....G','.......'],d:1,par:3,ok:['F','L','R','WHILE','END']},
-{n:'Ular',h:'Gabungkan semuanya: urutan, ulangi, dan selama.',g:['S....','####.','.....','.####','G....'],d:1,par:13,ok:Object.keys(TK)}
-];
-let LP=[],LI=0,LT=null;
-const lstar=i=>(D&&D.lab&&D.lab[i])||0;
-const labStars=()=>LV.reduce((a,_,i)=>a+lstar(i),0);
-function lab(id){clearInterval(LT);const i=+id;if(id===undefined||id===''||!(i>=0&&i<LV.length)||(i>0&&(!lstar(i-1)||!lopen(i))))return labList();LI=i;LP=[];labLevel()}
-function labList(){
-  wide(false);
-  app.innerHTML=`<a href="#/">← Beranda</a><h1>Lab Koding: Robot Penjelajah</h1><p class="mu">Susun perintah agar robot sampai ke bendera. Makin sedikit blok yang dipakai, makin banyak bintang. Level berikutnya dibuka oleh gurumu.</p>`+LV.map((v,i)=>{
-    const prev=i===0||lstar(i-1)>0,op=prev&&lopen(i),s=lstar(i);
-    const sub=op?'⭐'.repeat(s)+'☆'.repeat(3-s):prev?'Menunggu gurumu membuka level ini':'Selesaikan level sebelumnya';
-    const inner=`<span class="num">${op?i+1:'🔒'}</span><b>${v.n}</b><br><span class="mu">${sub}</span>`;
-    return op?`<a class="card lv" href="#/lab/${i}">${inner}</a>`:`<div class="card lv lock">${inner}</div>`;
-  }).join('');
-}
-const DX=[0,1,0,-1],DY=[-1,0,1,0];
-function gridOf(v){let s,gl,w=[];v.g.forEach((r,y)=>[...r].forEach((c,x)=>{if(c==='S')s=[x,y];if(c==='G')gl=[x,y];if(c==='#')w.push(x+','+y)}));return{R:v.g.length,C:v.g[0].length,s,gl,w}}
-function parse(){const root=[],st=[root];for(const k of LP){const cur=st[st.length-1];if(k==='END'){if(st.length>1)st.pop();continue}if(k.startsWith('REP')){const n={t:'rep',n:+k[3],b:[]};cur.push(n);st.push(n.b)}else if(k==='WHILE'){const n={t:'while',b:[]};cur.push(n);st.push(n.b)}else cur.push({t:k})}return root}
-function sim(G,d0){
-  let x=G.s[0],y=G.s[1],a=d0*90,out=[{x,y,a}],err='',n=0;
-  const dir=()=>((a/90)%4+4)%4;
-  const free=()=>{const d=dir(),nx=x+DX[d],ny=y+DY[d];return nx>=0&&ny>=0&&nx<G.C&&ny<G.R&&!G.w.includes(nx+','+ny)};
-  const ex=ns=>{for(const o of ns){if(err)return;if(++n>400){err='long';return}
-    if(o.t==='F'){if(!free()){err='bump';return}x+=DX[dir()];y+=DY[dir()];out.push({x,y,a})}
-    else if(o.t==='L'){a-=90;out.push({x,y,a})}
-    else if(o.t==='R'){a+=90;out.push({x,y,a})}
-    else if(o.t==='rep'){for(let i=0;i<o.n&&!err;i++)ex(o.b)}
-    else if(o.t==='while'){if(!o.b.length){err='long';return}while(!err&&free())ex(o.b)}}};
-  ex(parse());return{out,err,x,y};
-}
-function drawProg(){
-  let d=0;const p=document.getElementById('prog');
-  p.innerHTML=LP.length?LP.map((k,i)=>{if(k==='END')d=Math.max(0,d-1);const h=`<button class="tok" data-i="${i}" style="margin-left:${d*18}px">${TK[k]} ✕</button>`;if(/^(REP|WHILE)/.test(k))d++;return h}).join(''):'<span class="mu">Program masih kosong. Ketuk tombol perintah di bawah. Ketuk perintah di sini untuk menghapusnya.</span>';
-  p.onclick=e=>{const b=e.target.closest('[data-i]');if(b){LP.splice(+b.dataset.i,1);drawProg()}};
-}
-function labLevel(){
-  const v=LV[LI],G=gridOf(v);let cells='';
-  for(let y=0;y<G.R;y++)for(let x=0;x<G.C;x++)cells+=`<i class="${G.w.includes(x+','+y)?'wl':''}">${G.gl[0]===x&&G.gl[1]===y?'🏁':''}</i>`;
-  app.innerHTML=`<a href="#/lab">← Level</a><h1>Level ${LI+1}: ${v.n}</h1><p class="mu">${v.h}</p><div class="board" style="--c:${G.C};--r:${G.R};aspect-ratio:${G.C}/${G.R}">${cells}<div id="rob" class="rob" style="width:${100/G.C}%;height:${100/G.R}%"><span>🤖</span><u id="arw"></u></div></div><div id="msg" class="card">Susun perintah, lalu tekan Jalankan. Target: ${v.par} blok atau kurang untuk 3 bintang.</div><div class="card" id="prog"></div><div id="pal">${v.ok.map(k=>`<button class="alt" data-k="${k}">${TK[k]}</button>`).join('')}</div><button id="run">▶ Jalankan</button><button class="alt" id="clr">Hapus semua</button>`;
-  const rob=document.getElementById('rob'),arw=document.getElementById('arw'),msg=document.getElementById('msg');
-  const setRob=s=>{rob.style.left=s.x*100/G.C+'%';rob.style.top=s.y*100/G.R+'%';arw.style.transform=`rotate(${s.a}deg)`};
-  const home0={x:G.s[0],y:G.s[1],a:v.d*90};setRob(home0);drawProg();
-  document.getElementById('pal').onclick=e=>{const k=e.target.dataset.k;if(k&&LP.length<30){LP.push(k);drawProg()}};
-  document.getElementById('clr').onclick=()=>{clearInterval(LT);LP=[];drawProg();setRob(home0)};
-  document.getElementById('run').onclick=()=>{
-    if(!LP.length)return;clearInterval(LT);const r=sim(G,v.d);let i=0;setRob(r.out[0]);msg.textContent='Robot berjalan…';
-    LT=setInterval(()=>{
-      if(++i<r.out.length){setRob(r.out[i]);return}
-      clearInterval(LT);
-      if(!r.err&&r.x===G.gl[0]&&r.y===G.gl[1]){
-        const n=LP.length,s=n<=v.par?3:n<=v.par+3?2:1;D.lab=D.lab||{};D.lab[LI]=Math.max(lstar(LI),s);rpc('lms_kirim_lab',{p_level:LI,p_bintang:s}).catch(()=>{});
-        msg.innerHTML=`<b class="ok">Berhasil! ${'⭐'.repeat(s)}</b><br>${n} blok (target ${v.par}).<br>`+(LI<LV.length-1?(lopen(LI+1)?`<a class="btn" href="#/lab/${LI+1}">Level berikutnya</a>`:`<span class="mu">Level berikutnya akan dibuka oleh gurumu.</span><br><a class="btn alt" href="#/lab">Daftar level</a>`):`<b>Semua level selesai. Hebat!</b>`);
-      }else msg.textContent=r.err==='bump'?'Robot menabrak tembok atau batas papan. Periksa lagi perintahmu.':r.err==='long'?'Program terlalu lama, mungkin ada perulangan yang tidak berujung.':'Robot belum sampai di bendera. Coba lagi.';
-    },350);
-  };
-}
-/* ---------- Dashboard guru ---------- */
-const KUNCI=[...M.slice(1).map((m,i)=>({k:'m'+(i+2),t:`Modul ${i+2}: ${m.t}`})),...LV.slice(1).map((v,i)=>({k:'l'+(i+1),t:`Lab level ${i+2}: ${v.n}`}))];
-const kLabel=k=>(KUNCI.find(x=>x.k===k)||{t:k}).t;
-const kShort=k=>k[0]==='m'?'M'+k.slice(1):'L'+(+k.slice(1)+1);
-const labSum=r=>Object.values(r.lab||{}).reduce((a,b)=>a+b,0);
-async function guruLoad(){
-  const b=document.getElementById('gr');if(b)b.textContent='Memuat…';
-  try{G.rows=(await rpc('lms_rekap_guru')).sort(sortKelas);G.err=''}catch(e){if(e.status===401||!SES)return route();G.err=e.message}
-  if(b)b.textContent='↻ Muat ulang';
-  drawG();
-}
-function guru(){
-  wide(true);
-  if(!G)G={rows:null,kelas:'',q:'',sel:new Set(),kunci:'m2',err:''};
-  app.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><h1 style="margin:0">Dashboard guru</h1><div><button class="alt" id="gr">↻ Muat ulang</button><button class="alt" id="gx">⬇ Ekspor CSV</button><button class="alt" id="go">Keluar</button></div></div><p class="mu">${esc(D.nama)}. Pantau nilai dan progres, lalu buka modul atau level lab untuk siswa.</p>
-  <div class="card" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><select id="gk" aria-label="Kelas"><option value="">Semua kelas</option></select><input type="text" id="gq" placeholder="Cari nama atau username" style="max-width:280px;margin:0" aria-label="Cari"></div>
-  <div id="gs"></div><div id="gb"></div><div class="card" style="padding:6px 12px;overflow-x:auto" id="gt"></div>`;
-  document.getElementById('gr').onclick=guruLoad;
-  document.getElementById('go').onclick=logout;
-  document.getElementById('gx').onclick=exportCsv;
-  document.getElementById('gk').onchange=e=>{G.kelas=e.target.value;G.sel.clear();drawG()};
-  document.getElementById('gq').oninput=e=>{G.q=e.target.value.trim().toLowerCase();drawG()};
-  if(G.rows)drawG();else guruLoad();
-}
-const shown=()=>G.rows.filter(r=>(!G.kelas||r.kelas===G.kelas)&&(!G.q||r.nama.toLowerCase().includes(G.q)||r.username.toLowerCase().includes(G.q)));
-function drawG(){
-  const gt=document.getElementById('gt');if(!gt)return;
-  if(!G.rows){gt.innerHTML=G.err?`<p class="bad">${esc(G.err)}</p>`:'<p class="mu">Memuat…</p>';return}
-  const sk=document.getElementById('gk'),ks=[...new Set(G.rows.map(r=>r.kelas))].sort((a,b)=>a.localeCompare(b,'id',{numeric:true}));
-  if(sk.options.length-1!==ks.length){sk.innerHTML='<option value="">Semua kelas</option>'+ks.map(k=>`<option value="${esc(k)}">Kelas ${esc(k)}</option>`).join('');sk.value=G.kelas}
-  const rows=shown(),n=rows.length,mods=M.filter(has);
-  const masuk=rows.filter(r=>r.terakhir_masuk).length;
-  const lulus=mods.map(m=>{const c=rows.filter(r=>((r.best||{})[m.id]??-1)>=PASS).length;return `<div style="margin:8px 0"><div class="mu">Lulus ${esc(m.t)}: <b>${c}</b> / ${n}</div><div class="bar"><i style="width:${n?c/n*100:0}%"></i></div></div>`}).join('');
-  const akses=KUNCI.map(x=>({x,c:rows.filter(r=>(r.buka||[]).includes(x.k)).length})).filter(a=>a.c>0).map(a=>`<span class="chip">${kShort(a.x.k)} ${a.c}/${n}</span>`).join('')||'<span class="mu">belum ada</span>';
-  document.getElementById('gs').innerHTML=`<div class="card"><b>${n} siswa</b>${G.kelas?' di kelas '+esc(G.kelas):''} · sudah pernah masuk: <b>${masuk}</b> · belum: <b>${n-masuk}</b>${lulus}<div class="mu" style="margin-top:8px">Akses yang sudah dibuka: ${akses}</div></div>`;
-  const selShown=rows.filter(r=>G.sel.has(r.id)),target=selShown.length?selShown:rows;
-  document.getElementById('gb').innerHTML=`<div class="card" style="border-color:var(--ac)"><b>Buka atau tutup akses</b><div class="mu" style="margin:4px 0 10px">Berlaku untuk <b>${target.length}</b> siswa ${selShown.length?'(yang dicentang)':'(semua yang tampil, atau centang siswa tertentu di tabel)'}.</div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><select id="gc" aria-label="Pilih modul atau level">${KUNCI.map(x=>`<option value="${x.k}"${x.k===G.kunci?' selected':''}>${esc(x.t)}</option>`).join('')}</select><button id="gbuka">Buka</button><button class="alt" id="gtutup">Tutup</button></div></div>`;
-  document.getElementById('gc').onchange=e=>{G.kunci=e.target.value};
-  const aksi=async buka=>{
-    if(!target.length)return;
-    if(!confirm(`${buka?'Buka':'Tutup'} "${kLabel(G.kunci)}" untuk ${target.length} siswa${G.kelas&&!selShown.length?' kelas '+G.kelas:''}?`))return;
-    const b1=document.getElementById('gbuka'),b2=document.getElementById('gtutup');b1.disabled=b2.disabled=true;
-    try{await rpc(buka?'lms_buka_akses':'lms_tutup_akses',{p_user_ids:target.map(r=>r.id),p_kunci:G.kunci});G.sel.clear();await guruLoad()}
-    catch(e){alert(e.message);b1.disabled=b2.disabled=false}
-  };
-  document.getElementById('gbuka').onclick=()=>aksi(true);
-  document.getElementById('gtutup').onclick=()=>aksi(false);
-  const allOn=n>0&&selShown.length===n;
-  gt.innerHTML=`<table class="g"><thead><tr><th><input type="checkbox" id="ga" aria-label="Pilih semua yang tampil" ${allOn?'checked':''}></th><th>Nama</th><th>Kelas</th>${mods.map(m=>`<th title="${esc(m.t)}">${m.id.toUpperCase()}</th>`).join('')}<th>Lab ⭐</th><th>Akses</th><th>Terakhir masuk</th></tr></thead><tbody>`+rows.map(r=>`<tr><td><input type="checkbox" data-id="${r.id}" ${G.sel.has(r.id)?'checked':''} aria-label="Pilih ${esc(r.nama)}"></td><td>${esc(r.nama)}<div class="mu" style="font-size:.75rem">${esc(r.username)}</div></td><td>${esc(r.kelas)}</td>${mods.map(m=>{const v=(r.best||{})[m.id];return `<td class="${v==null?'mu':v>=PASS?'ok':'bad'}" title="${(r.att||{})[m.id]||0} percobaan">${v==null?'-':v}</td>`}).join('')}<td>${labSum(r)||'-'}</td><td>${(r.buka||[]).slice().sort().map(k=>`<span class="chip">${kShort(k)}</span>`).join('')||'<span class="mu">-</span>'}</td><td class="${r.terakhir_masuk?'':'mu'}">${r.terakhir_masuk?new Date(r.terakhir_masuk).toLocaleString('id-ID',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'belum'}</td></tr>`).join('')+`</tbody></table>`+(n?'':'<p class="mu">Tidak ada siswa yang cocok.</p>');
-  document.getElementById('ga').onchange=e=>{rows.forEach(r=>e.target.checked?G.sel.add(r.id):G.sel.delete(r.id));drawG()};
-  gt.querySelectorAll('tbody input[type=checkbox]').forEach(c=>c.onchange=()=>{c.checked?G.sel.add(c.dataset.id):G.sel.delete(c.dataset.id);drawG()});
-}
-function exportCsv(){
-  if(!G||!G.rows)return;
-  const mods=M.filter(has),q=v=>'"'+String(v).replace(/"/g,'""')+'"';
-  const head=['Nama','Kelas','Username','Sudah masuk',...mods.map(m=>m.t),'Bintang lab','Akses dibuka'];
-  const lines=[head,...shown().map(r=>[r.nama,r.kelas,r.username,r.terakhir_masuk?'sudah':'belum',...mods.map(m=>(r.best||{})[m.id]??''),labSum(r),(r.buka||[]).slice().sort().map(kShort).join(' ')])];
-  const blob=new Blob(['﻿'+lines.map(l=>l.map(q).join(',')).join('\n')],{type:'text/csv;charset=utf-8'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='rekap-nilai.csv';document.body.appendChild(a);a.click();a.remove();
-}
+    // ==========================================
+    // 4. FETCH DATA (REAL API / FALLBACK)
+    // ==========================================
+    async function fetchLiveDataFromSupabase() {
+      try {
+        if (SUPABASE_FUNCTION_URL.includes('YOUR_PROJECT_ID')) {
+          throw new Error('Supabase URL belum dikonfigurasi.');
+        }
 
-async function route(){
-  const my=++RT;scrollTo(0,0);
-  if(!SES){D=null;return login()}
-  const [,t,id]=location.hash.slice(1).split('/');
-  if(!D||!t||(t==='lab'&&id===undefined)){
-    try{await load()}catch(e){if(my!==RT)return;if(!D)return failed(e)}
-    if(my!==RT)return;
-  }
-  if(D.peran==='guru')return guru();
-  const i=M.findIndex(m=>m.id===id),m=M[i];
-  if(t==='r')return hasil();
-  if(t==='lab')return lab(id);
-  if((t==='m'||t==='q')&&m&&has(m)&&unlocked(i)){
-    if(t==='m'){Q=null;return modul(m)}
-    return quiz(m);
-  }
-  home();
-}
-addEventListener('hashchange',route);
-route();
-</script>
+        const response = await fetch(SUPABASE_FUNCTION_URL, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!response.ok) throw new Error('Network response failed');
+        const data = await response.json();
+        return { ...data, is_live: true };
+
+      } catch (err) {
+        console.warn('Menggunakan Fallback Mock Data:', err.message);
+        return fallbackMockData();
+      }
+    }
+
+    // ==========================================
+    // 5. RENDER ZONA 1 (VIS-NETWORK GRAPH)
+    // ==========================================
+    function renderGraph(data) {
+      const container = document.getElementById('network-graph');
+      
+      const nodes = [
+        { id: 'QQQ', label: 'QQQ\n(Benchmark)', shape: 'ellipse', color: { background: '#0d6efd', border: '#0a58ca' }, font: { color: '#ffffff', size: 16, bold: true } }
+      ];
+
+      const edges = [];
+
+      data.stocks.forEach(stock => {
+        const signal = evaluateSignal(data.qqq_return_15m, stock.corr, stock.return15m);
+        
+        // Buat Node Satelit
+        nodes.push({
+          id: stock.ticker,
+          label: `${stock.ticker}\n$${stock.price}`,
+          shape: 'box',
+          color: { background: '#212529', border: signal.color },
+          font: { color: '#ffffff' },
+          margin: 10
+        });
+
+        // Buat Edge (Garis Korelasi)
+        edges.push({
+          from: 'QQQ',
+          to: stock.ticker,
+          value: stock.corr * 5, // Ketebalan garis berdasar korelasi
+          title: `Correlation (r): ${stock.corr}`,
+          color: { color: signal.color, highlight: signal.color }
+        });
+      });
+
+      const graphData = {
+        nodes: new vis.DataSet(nodes),
+        edges: new vis.DataSet(edges)
+      };
+
+      const options = {
+        physics: {
+          barnesHut: {
+            gravitationalConstant: -3000,
+            centralGravity: 0.3,
+            springLength: 120
+          }
+        },
+        interaction: { hover: true }
+      };
+
+      if (networkInstance) networkInstance.destroy();
+      networkInstance = new vis.Network(container, graphData, options);
+    }
+
+    // ==========================================
+    // 6. RENDER ZONA 2 (TABEL SINYAL)
+    // ==========================================
+    function renderTable(data) {
+      const tbody = document.getElementById('signal-table-body');
+      document.getElementById('qqq-return').innerText = `${data.qqq_return_15m > 0 ? '+' : ''}${data.qqq_return_15m.toFixed(2)}%`;
+
+      tbody.innerHTML = '';
+
+      data.stocks.forEach(stock => {
+        const signal = evaluateSignal(data.qqq_return_15m, stock.corr, stock.return15m);
+        
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td class="fw-bold">${stock.ticker}</td>
+          <td>${stock.corr.toFixed(2)}</td>
+          <td class="${stock.return15m >= 0 ? 'text-success' : 'text-danger'}">
+            ${stock.return15m > 0 ? '+' : ''}${stock.return15m.toFixed(2)}%
+          </td>
+          <td><span class="badge ${signal.badgeClass}">${signal.label}</span></td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    // ==========================================
+    // 7. UTAMA (LOAD DATA)
+    // ==========================================
+    async function loadDashboardData() {
+      const badge = document.getElementById('data-status-badge');
+      badge.className = 'badge bg-secondary text-light px-3 py-2';
+      badge.innerText = 'Loading Data...';
+
+      const data = await fetchLiveDataFromSupabase();
+
+      if (data.is_live) {
+        badge.className = 'badge bg-success text-white px-3 py-2';
+        badge.innerText = 'Live Supabase Data';
+      } else {
+        badge.className = 'badge bg-warning text-dark px-3 py-2';
+        badge.innerText = 'Simulation Mode (Mock Data)';
+      }
+
+      renderGraph(data);
+      renderTable(data);
+    }
+
+    // Jalankan pertama kali saat halaman dibuka
+    window.onload = loadDashboardData;
+  </script>
 </body>
 </html>
