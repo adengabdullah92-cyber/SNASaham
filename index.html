@@ -81,10 +81,7 @@
   </div>
 
   <script>
-    // ==========================================
-    // SUPABASE CONFIGURATION
-    // Ganti nilai di bawah dengan URL & Anon Key Supabase milikmu
-    // ==========================================
+    // MASUKKAN CREDENTIALS PUBLIC SUPABASE KAMU DI SINI
     const SUPABASE_URL = "https://GANTI_PROJECT_REF.supabase.co";
     const SUPABASE_ANON_KEY = "GANTI_ANON_KEY_SUPABASE_KAMU";
 
@@ -96,7 +93,6 @@
       const lastUpdated = document.getElementById('lastUpdated');
 
       try {
-        // Ambil 20 record terakhir dari tabel signal_logs
         const { data, error, count } = await supabaseClient
           .from('signal_logs')
           .select('*', { count: 'exact' })
@@ -155,10 +151,7 @@
       }
     }
 
-    // Auto load saat pertama kali dibuka
     loadSignalLogs();
-
-    // Auto refresh setiap 30 detik
     setInterval(loadSignalLogs, 30000);
   </script>
 </body>
