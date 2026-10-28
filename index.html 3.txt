@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stock SNA DSS Dashboard</title>
+  
+  <!-- Bootstrap 5 CSS (Dark Theme Accent) -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Vis-Network CSS -->
+  <link href="https://unpkg.com/vis-network/standalone/umd/vis-network.min.css" rel="stylesheet" type="text/css" />
+
+  <style>
+    body {
+      background-color: #121212;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .card-dark {
+      background-color: #1e1e1e;
+      border: 1px solid #2d2d2d;
+      border-radius: 12px;
+    }
+    #network-graph {
+      width: 100%;
+      height: 480px;
+      background-color: #181818;
+      border-radius: 8px;
+    }
+    .badge-lagging {
+      background-color: #ffc107;
+      color: #000;
+      font-weight: 600;
+    }
+    .badge-momentum {
+      background-color: #198754;
+      color: #fff;
+      font-weight: 600;
+    }
+    .badge-neutral {
+      background-color: #6c757d;
+      color: #fff;
+    }
+    .table-dark-custom {
+      --bs-table-bg: #1e1e1e;
+      --bs-table-border-color: #2d2d2d;
+      color: #e0e0e0;
+    }
+  </style>
+</head>
+<body class="py-4">
+
+  <div class="container-fluid px-4">
+    <!-- Top Bar -->
+    <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom border-secondary">
+      <div>
+        <h3 class="fw-bold m-0 text-light">📈 Stock SNA DSS Dashboard</h3>
+        <small class="text-muted">Single-Index Model Lagging Signal Detector ($QQQ Benchmark)</small>
+      </div>
+      <div class="d-flex align-items-center gap-3">
+        <span id="data-status-badge" class="badge bg-warning text-dark px-3 py-2">Simulation Mode (Mock Data)</span>
+        <button id="btn-refresh" class="btn btn-outline-primary btn-sm px-3" onclick="loadDashboardData()">
+          🔄 Refresh Data
+        </button>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <!-- Zona 1: Visual SNA Graph -->
+      <div class="col-lg-7">
+        <div class="card card-dark p-3 h-100">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="m-0 text-light">Zona 1: Radial Correlation Graph</h5>
+            <small class="text-muted">Node hub: QQQ | Edge thickness: Correlation ($r$)</small>
+          </div>
+          <div id="network-graph"></div>
+        </div>
+      </div>
+
+      <!-- Zona 2: Tabel Sinyal DSS -->
+      <div class="col-lg-5">
+        <div class="card card-dark p-3 h-100">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="m-0 text-light">Zona 2: DSS Signal Table</h5>
+            <small class="text-muted">QQQ 15m Return: <span id="qqq-return" class="fw-bold text-info">0.00%</span></small>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-dark-custom align-middle">
+              <thead>
+                <tr>
+                  <th>Ticker</th>
+                  <th>Correlation ($r$)</th>
+                  <th>Return 15m</th>
+                  <th>Signal Status</th>
+                </tr>
+              </thead>
+              <tbody id="signal-table-body">
+                <!-- Data diisi oleh JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+
+  <script>
+    // ==========================================
+    // 1. KONFIGURASI SUPABASE EDGE FUNCTION
+    // ==========================================
+    // Ganti URL ini dengan URL Edge Function Supabase kamu jika sudah terpasang
+    const SUPABASE_FUNCTION_URL = 'https://hwezplmtngqbblhdaxio.supabase.co/functions/v1/telegram-agent';
+
+    let networkInstance = null;
+
+    // ==========================================
+    // 2. FALLBACK MOCK DATA (Untuk Uji Visual)
+    // ==========================================
+    function fallbackMockData() {
+      return {
+        is_live: false,
+        qqq_return_15m: 0.45,
+        stocks: [
+          { ticker: 'NVDA', corr: 0.89, return15m: 0.52, price: 128.50 },
+          { ticker: 'AMD',  corr: 0.84, return15m: 0.04, price: 154.20 }, // BUY LAGGING
+          { ticker: 'SMCI', corr: 0.82, return15m: 0.02, price: 45.10 },  // BUY LAGGING
+          { ticker: 'TSM',  corr: 0.78, return15m: 0.38, price: 172.00 },
+          { ticker: 'AAPL', corr: 0.45, return15m: -0.10, price: 224.30 }
+        ]
+      };
+    }
+
+    // ==========================================
+    // 3. LOGIKA EVALUASI SINYAL (DSS ENGINE)
+    // ==========================================
+    function evaluateSignal(benchReturn, corr, stockReturn) {
+      // Syarat BUY (LAGGING): QQQ > +0.20%, Korelasi >= 0.75, tapi saham belum naik (< +0.10%)
+      if (benchReturn > 0.20 && corr >= 0.75 && stockReturn < 0.10) {
+        return { label: 'BUY LAGGING', badgeClass: 'badge-lagging', color: '#ffc107' };
+      } 
+      else if (stockReturn >= 0.20 && corr >= 0.75) {
+        return { label: 'MOMENTUM', badgeClass: 'badge-momentum', color: '#198754' };
+      } 
+      else {
+        return { label: 'NEUTRAL', badgeClass: 'badge-neutral', color: '#6c757d' };
+      }
+    }
+
+    // ==========================================
+    // 4. FETCH DATA (REAL API / FALLBACK)
+    // ==========================================
+    async function fetchLiveDataFromSupabase() {
+      try {
+        if (SUPABASE_FUNCTION_URL.includes('YOUR_PROJECT_ID')) {
+          throw new Error('Supabase URL belum dikonfigurasi.');
+        }
+
+        const response = await fetch(SUPABASE_FUNCTION_URL, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!response.ok) throw new Error('Network response failed');
+        const data = await response.json();
+        return { ...data, is_live: true };
+
+      } catch (err) {
+        console.warn('Menggunakan Fallback Mock Data:', err.message);
+        return fallbackMockData();
+      }
+    }
+
+    // ==========================================
+    // 5. RENDER ZONA 1 (VIS-NETWORK GRAPH)
+    // ==========================================
+    function renderGraph(data) {
+      const container = document.getElementById('network-graph');
+      
+      const nodes = [
+        { id: 'QQQ', label: 'QQQ\n(Benchmark)', shape: 'ellipse', color: { background: '#0d6efd', border: '#0a58ca' }, font: { color: '#ffffff', size: 16, bold: true } }
+      ];
+
+      const edges = [];
+
+      data.stocks.forEach(stock => {
+        const signal = evaluateSignal(data.qqq_return_15m, stock.corr, stock.return15m);
+        
+        // Buat Node Satelit
+        nodes.push({
+          id: stock.ticker,
+          label: `${stock.ticker}\n$${stock.price}`,
+          shape: 'box',
+          color: { background: '#212529', border: signal.color },
+          font: { color: '#ffffff' },
+          margin: 10
+        });
+
+        // Buat Edge (Garis Korelasi)
+        edges.push({
+          from: 'QQQ',
+          to: stock.ticker,
+          value: stock.corr * 5, // Ketebalan garis berdasar korelasi
+          title: `Correlation (r): ${stock.corr}`,
+          color: { color: signal.color, highlight: signal.color }
+        });
+      });
+
+      const graphData = {
+        nodes: new vis.DataSet(nodes),
+        edges: new vis.DataSet(edges)
+      };
+
+      const options = {
+        physics: {
+          barnesHut: {
+            gravitationalConstant: -3000,
+            centralGravity: 0.3,
+            springLength: 120
+          }
+        },
+        interaction: { hover: true }
+      };
+
+      if (networkInstance) networkInstance.destroy();
+      networkInstance = new vis.Network(container, graphData, options);
+    }
+
+    // ==========================================
+    // 6. RENDER ZONA 2 (TABEL SINYAL)
+    // ==========================================
+    function renderTable(data) {
+      const tbody = document.getElementById('signal-table-body');
+      document.getElementById('qqq-return').innerText = `${data.qqq_return_15m > 0 ? '+' : ''}${data.qqq_return_15m.toFixed(2)}%`;
+
+      tbody.innerHTML = '';
+
+      data.stocks.forEach(stock => {
+        const signal = evaluateSignal(data.qqq_return_15m, stock.corr, stock.return15m);
+        
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td class="fw-bold">${stock.ticker}</td>
+          <td>${stock.corr.toFixed(2)}</td>
+          <td class="${stock.return15m >= 0 ? 'text-success' : 'text-danger'}">
+            ${stock.return15m > 0 ? '+' : ''}${stock.return15m.toFixed(2)}%
+          </td>
+          <td><span class="badge ${signal.badgeClass}">${signal.label}</span></td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    // ==========================================
+    // 7. UTAMA (LOAD DATA)
+    // ==========================================
+    async function loadDashboardData() {
+      const badge = document.getElementById('data-status-badge');
+      badge.className = 'badge bg-secondary text-light px-3 py-2';
+      badge.innerText = 'Loading Data...';
+
+      const data = await fetchLiveDataFromSupabase();
+
+      if (data.is_live) {
+        badge.className = 'badge bg-success text-white px-3 py-2';
+        badge.innerText = 'Live Supabase Data';
+      } else {
+        badge.className = 'badge bg-warning text-dark px-3 py-2';
+        badge.innerText = 'Simulation Mode (Mock Data)';
+      }
+
+      renderGraph(data);
+      renderTable(data);
+    }
+
+    // Jalankan pertama kali saat halaman dibuka
+    window.onload = loadDashboardData;
+  </script>
+</body>
+</html>
