@@ -3,281 +3,163 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Stock SNA DSS Dashboard</title>
-  
-  <!-- Bootstrap 5 CSS (Dark Theme Accent) -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <!-- Vis-Network CSS -->
-  <link href="https://unpkg.com/vis-network/standalone/umd/vis-network.min.css" rel="stylesheet" type="text/css" />
-
-  <style>
-    body {
-      background-color: #121212;
-      color: #e0e0e0;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-    .card-dark {
-      background-color: #1e1e1e;
-      border: 1px solid #2d2d2d;
-      border-radius: 12px;
-    }
-    #network-graph {
-      width: 100%;
-      height: 480px;
-      background-color: #181818;
-      border-radius: 8px;
-    }
-    .badge-lagging {
-      background-color: #ffc107;
-      color: #000;
-      font-weight: 600;
-    }
-    .badge-momentum {
-      background-color: #198754;
-      color: #fff;
-      font-weight: 600;
-    }
-    .badge-neutral {
-      background-color: #6c757d;
-      color: #fff;
-    }
-    .table-dark-custom {
-      --bs-table-bg: #1e1e1e;
-      --bs-table-border-color: #2d2d2d;
-      color: #e0e0e0;
-    }
-  </style>
+  <title>Stock SNA Live Trading Dashboard</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Supabase JS Client v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body class="py-4">
-
-  <div class="container-fluid px-4">
-    <!-- Top Bar -->
-    <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom border-secondary">
+<body class="bg-slate-900 text-slate-100 font-sans min-h-screen p-4 sm:p-8">
+  <div class="max-w-6xl mx-auto space-y-6">
+    
+    <!-- HEADER -->
+    <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-800/80 backdrop-blur border border-slate-700/60 p-5 rounded-2xl shadow-xl">
       <div>
-        <h3 class="fw-bold m-0 text-light">📈 Stock SNA DSS Dashboard</h3>
-        <small class="text-muted">Single-Index Model Lagging Signal Detector ($QQQ Benchmark)</small>
+        <div class="flex items-center gap-2">
+          <span class="inline-block w-3 h-3 bg-emerald-500 rounded-full animate-ping"></span>
+          <h1 class="text-2xl font-bold text-emerald-400">⚡ Stock SNA Live Dashboard</h1>
+        </div>
+        <p class="text-slate-400 text-sm mt-1">Single-Index Model (QQQ) Lead-Lag Detector & AI Guardrail Logs</p>
       </div>
-      <div class="d-flex align-items-center gap-3">
-        <span id="data-status-badge" class="badge bg-warning text-dark px-3 py-2">Simulation Mode (Mock Data)</span>
-        <button id="btn-refresh" class="btn btn-outline-primary btn-sm px-3" onclick="loadDashboardData()">
-          🔄 Refresh Data
-        </button>
+      <button onclick="loadSignalLogs()" class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition active:scale-95 shadow-lg shadow-emerald-600/20">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+        Refresh Logs
+      </button>
+    </header>
+
+    <!-- METRICS CARDS -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="bg-slate-800/60 border border-slate-700/60 p-4 rounded-xl">
+        <p class="text-slate-400 text-xs font-semibold uppercase tracking-wider">Total Signals Logged</p>
+        <p id="statTotal" class="text-2xl font-extrabold text-white mt-1">-</p>
+      </div>
+      <div class="bg-slate-800/60 border border-slate-700/60 p-4 rounded-xl">
+        <p class="text-slate-400 text-xs font-semibold uppercase tracking-wider">Benchmark Index</p>
+        <p class="text-2xl font-extrabold text-emerald-400 mt-1">$QQQ (Nasdaq 100)</p>
+      </div>
+      <div class="bg-slate-800/60 border border-slate-700/60 p-4 rounded-xl">
+        <p class="text-slate-400 text-xs font-semibold uppercase tracking-wider">AI Risk Guardrail</p>
+        <p class="text-2xl font-extrabold text-cyan-400 mt-1">Gemini 2.0 Flash</p>
       </div>
     </div>
 
-    <div class="row g-4">
-      <!-- Zona 1: Visual SNA Graph -->
-      <div class="col-lg-7">
-        <div class="card card-dark p-3 h-100">
-          <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="m-0 text-light">Zona 1: Radial Correlation Graph</h5>
-            <small class="text-muted">Node hub: QQQ | Edge thickness: Correlation ($r$)</small>
-          </div>
-          <div id="network-graph"></div>
-        </div>
+    <!-- SIGNAL HISTORY TABLE -->
+    <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-6 shadow-2xl">
+      <div class="flex justify-between items-center mb-5">
+        <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+          <span>📋</span> Sinyal Lagging Terdeteksi
+        </h2>
+        <span id="lastUpdated" class="text-xs text-slate-500 font-mono">Belum diperbarui</span>
       </div>
 
-      <!-- Zona 2: Tabel Sinyal DSS -->
-      <div class="col-lg-5">
-        <div class="card card-dark p-3 h-100">
-          <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="m-0 text-light">Zona 2: DSS Signal Table</h5>
-            <small class="text-muted">QQQ 15m Return: <span id="qqq-return" class="fw-bold text-info">0.00%</span></small>
-          </div>
-          <div class="table-responsive">
-            <table class="table table-dark-custom align-middle">
-              <thead>
-                <tr>
-                  <th>Ticker</th>
-                  <th>Correlation ($r$)</th>
-                  <th>Return 15m</th>
-                  <th>Signal Status</th>
-                </tr>
-              </thead>
-              <tbody id="signal-table-body">
-                <!-- Data diisi oleh JavaScript -->
-              </tbody>
-            </table>
-          </div>
-        </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm text-slate-300">
+          <thead class="bg-slate-700/40 text-slate-400 uppercase text-xs font-semibold tracking-wider">
+            <tr>
+              <th class="p-3.5 rounded-l-lg">Waktu</th>
+              <th class="p-3.5">Ticker</th>
+              <th class="p-3.5">QQQ (15m)</th>
+              <th class="p-3.5">Target (15m)</th>
+              <th class="p-3.5">Corr (r)</th>
+              <th class="p-3.5">Entry</th>
+              <th class="p-3.5">SL (-0.9%)</th>
+              <th class="p-3.5">TP (+1.5%)</th>
+              <th class="p-3.5 rounded-r-lg">AI Guardrail</th>
+            </tr>
+          </thead>
+          <tbody id="logsTable" class="divide-y divide-slate-700/50 font-mono text-xs sm:text-sm">
+            <tr>
+              <td colspan="9" class="p-8 text-center text-slate-500 font-sans">
+                Memuat riwayat sinyal dari Supabase...
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
+
   </div>
-
-  <!-- Scripts -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 
   <script>
     // ==========================================
-    // 1. KONFIGURASI SUPABASE EDGE FUNCTION
+    // SUPABASE CONFIGURATION
+    // Ganti nilai di bawah dengan URL & Anon Key Supabase milikmu
     // ==========================================
-    // Ganti URL ini dengan URL Edge Function Supabase kamu jika sudah terpasang
-    const SUPABASE_FUNCTION_URL = 'https://hwezplmtngqbblhdaxio.supabase.co/functions/v1/telegram-agent';
+    const SUPABASE_URL = "https://GANTI_PROJECT_REF.supabase.co";
+    const SUPABASE_ANON_KEY = "GANTI_ANON_KEY_SUPABASE_KAMU";
 
-    let networkInstance = null;
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // ==========================================
-    // 2. FALLBACK MOCK DATA (Untuk Uji Visual)
-    // ==========================================
-    function fallbackMockData() {
-      return {
-        is_live: false,
-        qqq_return_15m: 0.45,
-        stocks: [
-          { ticker: 'NVDA', corr: 0.89, return15m: 0.52, price: 128.50 },
-          { ticker: 'AMD',  corr: 0.84, return15m: 0.04, price: 154.20 }, // BUY LAGGING
-          { ticker: 'SMCI', corr: 0.82, return15m: 0.02, price: 45.10 },  // BUY LAGGING
-          { ticker: 'TSM',  corr: 0.78, return15m: 0.38, price: 172.00 },
-          { ticker: 'AAPL', corr: 0.45, return15m: -0.10, price: 224.30 }
-        ]
-      };
-    }
+    async function loadSignalLogs() {
+      const tbody = document.getElementById('logsTable');
+      const statTotal = document.getElementById('statTotal');
+      const lastUpdated = document.getElementById('lastUpdated');
 
-    // ==========================================
-    // 3. LOGIKA EVALUASI SINYAL (DSS ENGINE)
-    // ==========================================
-    function evaluateSignal(benchReturn, corr, stockReturn) {
-      // Syarat BUY (LAGGING): QQQ > +0.20%, Korelasi >= 0.75, tapi saham belum naik (< +0.10%)
-      if (benchReturn > 0.20 && corr >= 0.75 && stockReturn < 0.10) {
-        return { label: 'BUY LAGGING', badgeClass: 'badge-lagging', color: '#ffc107' };
-      } 
-      else if (stockReturn >= 0.20 && corr >= 0.75) {
-        return { label: 'MOMENTUM', badgeClass: 'badge-momentum', color: '#198754' };
-      } 
-      else {
-        return { label: 'NEUTRAL', badgeClass: 'badge-neutral', color: '#6c757d' };
-      }
-    }
-
-    // ==========================================
-    // 4. FETCH DATA (REAL API / FALLBACK)
-    // ==========================================
-    async function fetchLiveDataFromSupabase() {
       try {
-        if (SUPABASE_FUNCTION_URL.includes('YOUR_PROJECT_ID')) {
-          throw new Error('Supabase URL belum dikonfigurasi.');
+        // Ambil 20 record terakhir dari tabel signal_logs
+        const { data, error, count } = await supabaseClient
+          .from('signal_logs')
+          .select('*', { count: 'exact' })
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        if (error) throw error;
+
+        statTotal.innerText = count || (data ? data.length : 0);
+        lastUpdated.innerText = "Diperbarui: " + new Date().toLocaleTimeString('id-ID');
+
+        if (!data || data.length === 0) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="9" class="p-8 text-center text-slate-500 font-sans">
+                Belum ada sinyal lagging yang tercatat di database.
+              </td>
+            </tr>`;
+          return;
         }
 
-        const response = await fetch(SUPABASE_FUNCTION_URL, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' }
-        });
+        tbody.innerHTML = data.map(log => {
+          const dateStr = new Date(log.created_at).toLocaleTimeString('id-ID', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+          });
 
-        if (!response.ok) throw new Error('Network response failed');
-        const data = await response.json();
-        return { ...data, is_live: true };
+          return `
+            <tr class="hover:bg-slate-700/30 transition">
+              <td class="p-3.5 text-slate-400 font-sans">${dateStr}</td>
+              <td class="p-3.5 font-bold text-emerald-400 font-sans">$${log.ticker}</td>
+              <td class="p-3.5 text-emerald-400">+${log.qqq_return}%</td>
+              <td class="p-3.5 text-slate-300">+${log.stock_return}%</td>
+              <td class="p-3.5 font-bold text-cyan-400">${log.correlation}</td>
+              <td class="p-3.5 text-white">$${log.entry_price}</td>
+              <td class="p-3.5 text-rose-400">$${log.stop_loss}</td>
+              <td class="p-3.5 text-emerald-400">$${log.take_profit}</td>
+              <td class="p-3.5 font-sans">
+                <span class="bg-emerald-900/40 text-emerald-300 border border-emerald-700/60 text-[11px] px-2.5 py-1 rounded-full font-medium" title="${log.ai_reason || ''}">
+                  PASSED
+                </span>
+              </td>
+            </tr>
+          `;
+        }).join('');
 
       } catch (err) {
-        console.warn('Menggunakan Fallback Mock Data:', err.message);
-        return fallbackMockData();
+        console.error("Error loading logs:", err);
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="9" class="p-8 text-center text-rose-400 font-sans">
+              Gagal mengambil data dari Supabase: ${err.message}
+            </td>
+          </tr>`;
       }
     }
 
-    // ==========================================
-    // 5. RENDER ZONA 1 (VIS-NETWORK GRAPH)
-    // ==========================================
-    function renderGraph(data) {
-      const container = document.getElementById('network-graph');
-      
-      const nodes = [
-        { id: 'QQQ', label: 'QQQ\n(Benchmark)', shape: 'ellipse', color: { background: '#0d6efd', border: '#0a58ca' }, font: { color: '#ffffff', size: 16, bold: true } }
-      ];
+    // Auto load saat pertama kali dibuka
+    loadSignalLogs();
 
-      const edges = [];
-
-      data.stocks.forEach(stock => {
-        const signal = evaluateSignal(data.qqq_return_15m, stock.corr, stock.return15m);
-        
-        // Buat Node Satelit
-        nodes.push({
-          id: stock.ticker,
-          label: `${stock.ticker}\n$${stock.price}`,
-          shape: 'box',
-          color: { background: '#212529', border: signal.color },
-          font: { color: '#ffffff' },
-          margin: 10
-        });
-
-        // Buat Edge (Garis Korelasi)
-        edges.push({
-          from: 'QQQ',
-          to: stock.ticker,
-          value: stock.corr * 5, // Ketebalan garis berdasar korelasi
-          title: `Correlation (r): ${stock.corr}`,
-          color: { color: signal.color, highlight: signal.color }
-        });
-      });
-
-      const graphData = {
-        nodes: new vis.DataSet(nodes),
-        edges: new vis.DataSet(edges)
-      };
-
-      const options = {
-        physics: {
-          barnesHut: {
-            gravitationalConstant: -3000,
-            centralGravity: 0.3,
-            springLength: 120
-          }
-        },
-        interaction: { hover: true }
-      };
-
-      if (networkInstance) networkInstance.destroy();
-      networkInstance = new vis.Network(container, graphData, options);
-    }
-
-    // ==========================================
-    // 6. RENDER ZONA 2 (TABEL SINYAL)
-    // ==========================================
-    function renderTable(data) {
-      const tbody = document.getElementById('signal-table-body');
-      document.getElementById('qqq-return').innerText = `${data.qqq_return_15m > 0 ? '+' : ''}${data.qqq_return_15m.toFixed(2)}%`;
-
-      tbody.innerHTML = '';
-
-      data.stocks.forEach(stock => {
-        const signal = evaluateSignal(data.qqq_return_15m, stock.corr, stock.return15m);
-        
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td class="fw-bold">${stock.ticker}</td>
-          <td>${stock.corr.toFixed(2)}</td>
-          <td class="${stock.return15m >= 0 ? 'text-success' : 'text-danger'}">
-            ${stock.return15m > 0 ? '+' : ''}${stock.return15m.toFixed(2)}%
-          </td>
-          <td><span class="badge ${signal.badgeClass}">${signal.label}</span></td>
-        `;
-        tbody.appendChild(row);
-      });
-    }
-
-    // ==========================================
-    // 7. UTAMA (LOAD DATA)
-    // ==========================================
-    async function loadDashboardData() {
-      const badge = document.getElementById('data-status-badge');
-      badge.className = 'badge bg-secondary text-light px-3 py-2';
-      badge.innerText = 'Loading Data...';
-
-      const data = await fetchLiveDataFromSupabase();
-
-      if (data.is_live) {
-        badge.className = 'badge bg-success text-white px-3 py-2';
-        badge.innerText = 'Live Supabase Data';
-      } else {
-        badge.className = 'badge bg-warning text-dark px-3 py-2';
-        badge.innerText = 'Simulation Mode (Mock Data)';
-      }
-
-      renderGraph(data);
-      renderTable(data);
-    }
-
-    // Jalankan pertama kali saat halaman dibuka
-    window.onload = loadDashboardData;
+    // Auto refresh setiap 30 detik
+    setInterval(loadSignalLogs, 30000);
   </script>
 </body>
 </html>
