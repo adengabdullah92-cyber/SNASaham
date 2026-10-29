@@ -1,158 +1,966 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id" data-bs-theme="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Stock SNA Live Trading Dashboard</title>
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Supabase JS Client v2 -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stock SNA DSS</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+  <style>
+    :root {
+      --bg: #121212;
+      --card: #1c1c1e;
+      --card-border: #2c2c2e;
+      --muted: #9a9aa0;
+      --green: #28c76f;
+      --yellow: #ffc107;
+      --gray: #6c757d;
+      --red: #ea5455;
+      --blue: #3b82f6;
+    }
+    html, body { background: var(--bg); color: #e6e6e6; min-height: 100%; }
+    .navbar-dss { background: #181818; border-bottom: 1px solid var(--card-border); }
+    .card-dss { background: var(--card); border: 1px solid var(--card-border); border-radius: 12px; }
+    .card-dss .card-header { background: transparent; border-bottom: 1px solid var(--card-border); font-weight: 600; }
+    #graph { height: 520px; width: 100%; background: #151517; }
+    @media (max-width: 767px) { #graph { height: 420px; } }
+    .legend-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+    .legend-line { display: inline-block; width: 26px; height: 0; border-top: 3px solid #888; margin-right: 6px; vertical-align: middle; }
+    .legend-line.dashed { border-top-style: dashed; }
+    .table-dss { --bs-table-bg: transparent; --bs-table-hover-bg: #26262a; margin-bottom: 0; }
+    .table-dss th { color: var(--muted); font-weight: 500; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+    .table-dss td { vertical-align: middle; white-space: nowrap; }
+    .table-dss tbody tr.clickable { cursor: pointer; }
+    .table-dss tbody tr.selected { outline: 1px solid var(--blue); outline-offset: -1px; background: #1f2633; }
+    .row-buy { box-shadow: inset 3px 0 0 var(--yellow); }
+    .ticker-cell { font-weight: 700; letter-spacing: .02em; }
+    .pos { color: var(--green); }
+    .neg { color: var(--red); }
+    .badge-signal { font-size: .75rem; padding: .4em .7em; letter-spacing: .03em; }
+    .badge-buy { background: var(--yellow); color: #1a1a1a; }
+    .badge-momentum { background: var(--green); color: #07210f; }
+    .badge-neutral { background: var(--gray); color: #fff; }
+    .badge-avoid { background: var(--red); color: #fff; }
+    .text-muted-dss { color: var(--muted); }
+    .small-label { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .detail-value { font-size: 1.05rem; font-weight: 600; }
+    .form-range::-webkit-slider-runnable-track { background: #2c2c2e; }
+    .pulse { animation: pulse 1.6s infinite; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: .45; } 100% { opacity: 1; } }
+    .tiny { font-size: .75rem; }
+  </style>
 </head>
-<body class="bg-slate-900 text-slate-100 font-sans min-h-screen p-4 sm:p-8">
-  <div class="max-w-6xl mx-auto space-y-6">
-    
-    <!-- HEADER -->
-    <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-800/80 backdrop-blur border border-slate-700/60 p-5 rounded-2xl shadow-xl">
-      <div>
-        <div class="flex items-center gap-2">
-          <span class="inline-block w-3 h-3 bg-emerald-500 rounded-full animate-ping"></span>
-          <h1 class="text-2xl font-bold text-emerald-400">⚡ Stock SNA Live Dashboard</h1>
-        </div>
-        <p class="text-slate-400 text-sm mt-1">Single-Index Model (QQQ) Lead-Lag Detector & AI Guardrail Logs</p>
+<body>
+
+<!-- ========== TOP BAR ========== -->
+<nav class="navbar navbar-dss sticky-top">
+  <div class="container-fluid px-3 px-md-4 py-1 d-flex flex-wrap align-items-center gap-2">
+    <div class="d-flex align-items-center gap-2 me-auto">
+      <span class="fs-5 fw-bold">Stock SNA DSS</span>
+      <span class="text-muted-dss d-none d-md-inline small">Social Network Analysis &middot; Day Trading</span>
+    </div>
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <span id="statusBadge" class="badge text-bg-secondary">Memuat...</span>
+      <span id="marketBadge" class="badge text-bg-secondary">Pasar: -</span>
+      <span id="lastUpdated" class="text-muted-dss small">Last updated: -</span>
+      <div class="form-check form-switch mb-0 ms-1">
+        <input class="form-check-input" type="checkbox" role="switch" id="autoRefresh" checked>
+        <label class="form-check-label small" for="autoRefresh">Auto 60s</label>
       </div>
-      <button onclick="loadSignalLogs()" class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition active:scale-95 shadow-lg shadow-emerald-600/20">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-        Refresh Logs
+      <button id="btnRefresh" class="btn btn-sm btn-primary" type="button">
+        <span id="btnSpinner" class="spinner-border spinner-border-sm d-none" aria-hidden="true"></span>
+        <span id="btnLabel">Refresh Data</span>
       </button>
-    </header>
+    </div>
+  </div>
+</nav>
 
-    <!-- METRICS CARDS -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-      <div class="bg-slate-800/60 border border-slate-700/60 p-4 rounded-xl">
-        <p class="text-slate-400 text-xs font-semibold uppercase tracking-wider">Total Signals Logged</p>
-        <p id="statTotal" class="text-2xl font-extrabold text-white mt-1">-</p>
-      </div>
-      <div class="bg-slate-800/60 border border-slate-700/60 p-4 rounded-xl">
-        <p class="text-slate-400 text-xs font-semibold uppercase tracking-wider">Benchmark Index</p>
-        <p class="text-2xl font-extrabold text-emerald-400 mt-1">$QQQ (Nasdaq 100)</p>
-      </div>
-      <div class="bg-slate-800/60 border border-slate-700/60 p-4 rounded-xl">
-        <p class="text-slate-400 text-xs font-semibold uppercase tracking-wider">AI Risk Guardrail</p>
-        <p class="text-2xl font-extrabold text-cyan-400 mt-1">Gemini 2.0 Flash</p>
+<main class="container-fluid px-3 px-md-4 py-3">
+
+  <div id="alertBox"></div>
+
+  <!-- ========== PENGATURAN THRESHOLD ========== -->
+  <div class="card card-dss mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center" role="button" data-bs-toggle="collapse" data-bs-target="#settingsBody" aria-expanded="false">
+      <span>Pengaturan Threshold Tampilan</span>
+      <span class="small text-muted-dss">klik untuk buka/tutup</span>
+    </div>
+    <div id="settingsBody" class="collapse">
+      <div class="card-body">
+        <div class="row g-4">
+          <div class="col-md-4">
+            <label for="rngQqq" class="form-label small-label">Return 15m QQQ minimal (%) &mdash; <span id="lblQqq" class="text-light"></span></label>
+            <input type="range" class="form-range" id="rngQqq" min="0.05" max="1" step="0.05">
+          </div>
+          <div class="col-md-4">
+            <label for="rngCorr" class="form-label small-label">Korelasi minimal (r) &mdash; <span id="lblCorr" class="text-light"></span></label>
+            <input type="range" class="form-range" id="rngCorr" min="0.3" max="0.95" step="0.05">
+          </div>
+          <div class="col-md-4">
+            <label for="rngLag" class="form-label small-label">Batas "tertinggal": return saham &lt; (%) &mdash; <span id="lblLag" class="text-light"></span></label>
+            <input type="range" class="form-range" id="rngLag" min="0" max="0.5" step="0.05">
+          </div>
+        </div>
+        <div class="d-flex flex-wrap align-items-center gap-3 mt-3">
+          <button id="btnResetCfg" class="btn btn-sm btn-outline-secondary" type="button">Reset ke default (0.2% / 0.75 / 0.1%)</button>
+          <span class="tiny text-muted-dss">Slider ini hanya mengubah tampilan di browser Anda. Alert Telegram dan catatan riwayat memakai threshold di server.</span>
+        </div>
+        <div id="serverCfg" class="tiny text-muted-dss mt-2"></div>
       </div>
     </div>
-
-    <!-- SIGNAL HISTORY TABLE -->
-    <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-6 shadow-2xl">
-      <div class="flex justify-between items-center mb-5">
-        <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
-          <span>📋</span> Sinyal Lagging Terdeteksi
-        </h2>
-        <span id="lastUpdated" class="text-xs text-slate-500 font-mono">Belum diperbarui</span>
-      </div>
-
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-sm text-slate-300">
-          <thead class="bg-slate-700/40 text-slate-400 uppercase text-xs font-semibold tracking-wider">
-            <tr>
-              <th class="p-3.5 rounded-l-lg">Waktu</th>
-              <th class="p-3.5">Ticker</th>
-              <th class="p-3.5">QQQ (15m)</th>
-              <th class="p-3.5">Target (15m)</th>
-              <th class="p-3.5">Corr (r)</th>
-              <th class="p-3.5">Entry</th>
-              <th class="p-3.5">SL (-0.9%)</th>
-              <th class="p-3.5">TP (+1.5%)</th>
-              <th class="p-3.5 rounded-r-lg">AI Guardrail</th>
-            </tr>
-          </thead>
-          <tbody id="logsTable" class="divide-y divide-slate-700/50 font-mono text-xs sm:text-sm">
-            <tr>
-              <td colspan="9" class="p-8 text-center text-slate-500 font-sans">
-                Memuat riwayat sinyal dari Supabase...
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
   </div>
 
-  <script>
-    // MASUKKAN CREDENTIALS PUBLIC SUPABASE KAMU DI SINI
-    const SUPABASE_URL = "https://GANTI_PROJECT_REF.supabase.co";
-    const SUPABASE_ANON_KEY = "GANTI_ANON_KEY_SUPABASE_KAMU";
+  <div class="row g-3 mb-3">
+    <!-- ========== ZONA 1: SNA GRAPH ========== -->
+    <div class="col-lg-8">
+      <div class="card card-dss h-100">
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <span>Zona 1 &mdash; SNA Graph (Hub: QQQ)</span>
+          <span class="small text-muted-dss">
+            <span class="legend-dot" style="background:var(--green)"></span>Synced/Momentum
+            <span class="legend-dot ms-2" style="background:var(--yellow)"></span>Lagging (BUY)
+            <span class="legend-dot ms-2" style="background:var(--gray)"></span>Neutral
+            <span class="legend-dot ms-2" style="background:var(--red)"></span>Avoid
+          </span>
+        </div>
+        <div id="graph"></div>
+        <div class="card-footer bg-transparent small text-muted-dss d-flex flex-wrap justify-content-between align-items-center gap-2" style="border-color:var(--card-border)!important">
+          <span>
+            <span class="legend-line"></span>Garis tebal = korelasi tinggi &nbsp;
+            <span class="legend-line dashed"></span>Putus-putus = korelasi negatif &nbsp;&middot;&nbsp; Dekat hub = korelasi kuat. Klik node untuk detail.
+          </span>
+          <button id="btnResetView" class="btn btn-sm btn-outline-secondary py-0" type="button">Reset tampilan</button>
+        </div>
+      </div>
+    </div>
 
-    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    <!-- ========== DETAIL PANEL ========== -->
+    <div class="col-lg-4">
+      <div class="card card-dss h-100">
+        <div class="card-header">Detail Saham</div>
+        <div class="card-body" id="detailPanel">
+          <p class="text-muted-dss mb-0">Klik sebuah node di graph atau baris di tabel untuk melihat detail dan alasan sinyal.</p>
+        </div>
+      </div>
+    </div>
+  </div>
 
-    async function loadSignalLogs() {
-      const tbody = document.getElementById('logsTable');
-      const statTotal = document.getElementById('statTotal');
-      const lastUpdated = document.getElementById('lastUpdated');
-
-      try {
-        const { data, error, count } = await supabaseClient
-          .from('signal_logs')
-          .select('*', { count: 'exact' })
-          .order('created_at', { ascending: false })
-          .limit(20);
-
-        if (error) throw error;
-
-        statTotal.innerText = count || (data ? data.length : 0);
-        lastUpdated.innerText = "Diperbarui: " + new Date().toLocaleTimeString('id-ID');
-
-        if (!data || data.length === 0) {
-          tbody.innerHTML = `
-            <tr>
-              <td colspan="9" class="p-8 text-center text-slate-500 font-sans">
-                Belum ada sinyal lagging yang tercatat di database.
-              </td>
-            </tr>`;
-          return;
-        }
-
-        tbody.innerHTML = data.map(log => {
-          const dateStr = new Date(log.created_at).toLocaleTimeString('id-ID', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
-          });
-
-          return `
-            <tr class="hover:bg-slate-700/30 transition">
-              <td class="p-3.5 text-slate-400 font-sans">${dateStr}</td>
-              <td class="p-3.5 font-bold text-emerald-400 font-sans">$${log.ticker}</td>
-              <td class="p-3.5 text-emerald-400">+${log.qqq_return}%</td>
-              <td class="p-3.5 text-slate-300">+${log.stock_return}%</td>
-              <td class="p-3.5 font-bold text-cyan-400">${log.correlation}</td>
-              <td class="p-3.5 text-white">$${log.entry_price}</td>
-              <td class="p-3.5 text-rose-400">$${log.stop_loss}</td>
-              <td class="p-3.5 text-emerald-400">$${log.take_profit}</td>
-              <td class="p-3.5 font-sans">
-                <span class="bg-emerald-900/40 text-emerald-300 border border-emerald-700/60 text-[11px] px-2.5 py-1 rounded-full font-medium" title="${log.ai_reason || ''}">
-                  PASSED
-                </span>
-              </td>
-            </tr>
-          `;
-        }).join('');
-
-      } catch (err) {
-        console.error("Error loading logs:", err);
-        tbody.innerHTML = `
+  <!-- ========== ZONA 2: TABEL SINYAL ========== -->
+  <div class="card card-dss mb-3">
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <span>Zona 2 &mdash; Tabel Sinyal DSS</span>
+      <span id="signalSummary" class="small"></span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-dss table-hover align-middle">
+        <thead>
           <tr>
-            <td colspan="9" class="p-8 text-center text-rose-400 font-sans">
-              Gagal mengambil data dari Supabase: ${err.message}
-            </td>
-          </tr>`;
-      }
-    }
+            <th>Ticker</th>
+            <th class="text-end">Harga</th>
+            <th class="text-end">Korelasi (r)</th>
+            <th class="text-end">Return 15m</th>
+            <th class="text-end">Volume 15m</th>
+            <th>Sinyal</th>
+            <th class="text-end">SL / TP</th>
+          </tr>
+        </thead>
+        <tbody id="signalBody"></tbody>
+      </table>
+    </div>
+    <div id="skippedNote" class="tiny text-muted-dss px-3 py-2"></div>
+  </div>
 
-    loadSignalLogs();
-    setInterval(loadSignalLogs, 30000);
-  </script>
+  <!-- ========== RIWAYAT SINYAL (SUPABASE signal_logs) ========== -->
+  <div class="card card-dss mb-3">
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <span>Riwayat Sinyal BUY LAGGING <span id="historyMode" class="tiny text-muted-dss"></span></span>
+      <span id="historySummary" class="small"></span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-dss table-hover align-middle">
+        <thead>
+          <tr>
+            <th>Waktu (WIB)</th>
+            <th>Ticker</th>
+            <th class="text-end">QQQ 15m</th>
+            <th class="text-end">Saham 15m</th>
+            <th class="text-end">r</th>
+            <th class="text-end">Entry</th>
+            <th class="text-end">SL</th>
+            <th class="text-end">TP</th>
+            <th>Guardrail AI</th>
+          </tr>
+        </thead>
+        <tbody id="historyBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="text-muted-dss small pb-4">
+    <strong>Disclaimer:</strong> Dashboard ini adalah alat bantu keputusan (Decision Support System) untuk tujuan edukasi dan analisis, bukan saran investasi.
+    Sinyal bersifat statistik dan dapat salah. Data berbasis bar 5 menit dan diperbarui tiap beberapa menit, bukan tick real-time. Day trading berisiko tinggi;
+    gunakan manajemen risiko Anda sendiri. Level SL/TP hanyalah ilustrasi.
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+/* =====================================================================
+ *  KONFIGURASI
+ * ===================================================================== */
+const SUPABASE_FUNCTION_URL = 'https://YOUR_PROJECT_ID.supabase.co/functions/v1/YOUR_FUNCTION_NAME';
+const SUPABASE_URL = 'https://YOUR_PROJECT_ID.supabase.co';
+// Anon key bersifat publik (memang untuk frontend). Jangan pernah menaruh service_role key di sini.
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+
+const BENCHMARK = 'QQQ';
+const REFRESH_INTERVAL_MS = 60000;   // auto refresh (hanya membaca snapshot, tidak memakai kredit API data)
+const FETCH_TIMEOUT_MS    = 10000;
+const STALE_AFTER_MS      = 480000;  // scan berjalan tiap 5 menit; > 8 menit saat pasar buka dianggap basi
+const HISTORY_LIMIT       = 30;
+const DEFAULT_SL_PCT = 0.9;          // hanya dipakai jika server tidak mengirim stop_loss/take_profit
+const DEFAULT_TP_PCT = 1.5;
+
+const DEFAULT_CFG = { qqqThreshold: 0.2, corrThreshold: 0.75, lagThreshold: 0.1 };
+const CFG_STORAGE_KEY = 'stockSnaDss.cfg.v1';
+
+const COLORS = { green: '#28c76f', yellow: '#ffc107', gray: '#6c757d', red: '#ea5455', blue: '#3b82f6' };
+
+const SIGNALS = {
+  BUY_LAGGING: { label: 'BUY LAGGING', badge: 'badge-buy',      color: COLORS.yellow, order: 0 },
+  MOMENTUM:    { label: 'MOMENTUM',    badge: 'badge-momentum', color: COLORS.green,  order: 1 },
+  AVOID:       { label: 'AVOID',       badge: 'badge-avoid',    color: COLORS.red,    order: 2 },
+  NEUTRAL:     { label: 'NEUTRAL',     badge: 'badge-neutral',  color: COLORS.gray,   order: 3 }
+};
+
+const GUARD = {
+  PASSED:   { label: 'PASSED',   cls: 'text-bg-success' },
+  NO_NEWS:  { label: 'NO NEWS',  cls: 'text-bg-secondary' },
+  BYPASSED: { label: 'BYPASSED', cls: 'text-bg-warning' },
+  REJECTED: { label: 'REJECTED', cls: 'text-bg-danger' }
+};
+
+/* =====================================================================
+ *  STATE
+ * ===================================================================== */
+const state = {
+  data: null,          // snapshot ternormalisasi
+  mode: 'simulation',  // 'live' | 'simulation'
+  selected: null,
+  cfg: loadCfg(),
+  loading: false,
+  lastRefreshAt: 0,
+  history: { rows: [], total: null, mode: 'simulation', error: null }
+};
+
+let network = null;
+let nodesDS = null;
+let edgesDS = null;
+let userMovedView = false;
+
+/* =====================================================================
+ *  UTILITAS
+ * ===================================================================== */
+const $ = (id) => document.getElementById(id);
+const isNum = (v) => typeof v === 'number' && isFinite(v);
+const toNum = (v) => (v === null || v === undefined || v === '') ? NaN : Number(v);
+const optNum = (v) => { const n = toNum(v); return isNum(n) ? n : null; };
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const rand = (lo, hi) => lo + Math.random() * (hi - lo);
+
+function escapeHtml(str) {
+  return String(str === null || str === undefined ? '' : str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// Tanda + hanya untuk nilai positif; nilai negatif membawa tanda '-' sendiri (tidak pernah "+-")
+function fmtPct(v, d = 2) {
+  if (!isNum(v)) return '-';
+  return (v > 0 ? '+' : '') + v.toFixed(d) + '%';
+}
+function fmtPrice(v) { return isNum(v) ? '$' + v.toFixed(2) : '-'; }
+function fmtVolume(v) {
+  if (!isNum(v)) return '-';
+  if (v >= 1e9) return (v / 1e9).toFixed(2) + 'B';
+  if (v >= 1e6) return (v / 1e6).toFixed(2) + 'M';
+  if (v >= 1e3) return (v / 1e3).toFixed(1) + 'K';
+  return String(Math.round(v));
+}
+function pctClass(v) { return (!isNum(v) || v === 0) ? '' : (v > 0 ? 'pos' : 'neg'); }
+
+function loadCfg() {
+  try {
+    const raw = localStorage.getItem(CFG_STORAGE_KEY);
+    if (raw) {
+      const p = JSON.parse(raw);
+      if (isNum(p.qqqThreshold) && isNum(p.corrThreshold) && isNum(p.lagThreshold)) return p;
+    }
+  } catch (e) { /* abaikan */ }
+  return Object.assign({}, DEFAULT_CFG);
+}
+function saveCfg() { try { localStorage.setItem(CFG_STORAGE_KEY, JSON.stringify(state.cfg)); } catch (e) { /* abaikan */ } }
+
+function isPlaceholder(s) { return typeof s !== 'string' || !s.startsWith('http') || s.includes('YOUR_'); }
+function isUrlConfigured() { return !isPlaceholder(SUPABASE_FUNCTION_URL); }
+function isAnonKeyConfigured() { return typeof SUPABASE_ANON_KEY === 'string' && SUPABASE_ANON_KEY.length > 20 && !SUPABASE_ANON_KEY.includes('YOUR_'); }
+function isDbConfigured() { return !isPlaceholder(SUPABASE_URL) && isAnonKeyConfigured(); }
+
+function authHeaders() {
+  const h = { 'Accept': 'application/json' };
+  if (isAnonKeyConfigured()) { h['Authorization'] = 'Bearer ' + SUPABASE_ANON_KEY; h['apikey'] = SUPABASE_ANON_KEY; }
+  return h;
+}
+
+async function fetchJsonTimeout(url, init) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, Object.assign({ cache: 'no-store', signal: ctrl.signal }, init));
+    if (!res.ok) {
+      let detail = '';
+      try { const j = await res.clone().json(); detail = j.error || j.message || ''; } catch (e) { /* abaikan */ }
+      throw new Error('HTTP ' + res.status + (detail ? ': ' + detail : ''));
+    }
+    return { res, json: await res.json() };
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error('timeout setelah ' + (FETCH_TIMEOUT_MS / 1000) + ' detik');
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/* =====================================================================
+ *  JAM PASAR AS (zona waktu New York, DST otomatis; libur bursa tidak dihitung)
+ * ===================================================================== */
+function getMarketStatus(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false
+  }).formatToParts(now);
+  const get = (t) => parts.find((p) => p.type === t).value;
+  const wd = get('weekday');
+  let h = parseInt(get('hour'), 10);
+  if (h === 24) h = 0;
+  const m = parseInt(get('minute'), 10);
+  const mins = h * 60 + m;
+  const open = wd !== 'Sat' && wd !== 'Sun' && mins >= 9 * 60 + 30 && mins < 16 * 60;
+  return { open, nyTime: String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') };
+}
+
+function fmtWibTime(date, withSeconds = true) {
+  return new Intl.DateTimeFormat('id-ID', {
+    timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', second: withSeconds ? '2-digit' : undefined, hour12: false
+  }).format(date).replace(/\./g, ':');
+}
+function fmtWibDateTime(date) {
+  const p = new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(date);
+  const g = (t) => (p.find((x) => x.type === t) || {}).value || '';
+  return g('day') + ' ' + g('month') + ' ' + g('hour') + ':' + g('minute');
+}
+
+/* =====================================================================
+ *  DSS ENGINE
+ *  BUY_LAGGING : QQQ > +qqqThreshold, r >= corrThreshold, saham < lagThreshold
+ *  MOMENTUM    : QQQ > +qqqThreshold, r >= corrThreshold, saham >= lagThreshold
+ *  AVOID       : QQQ < -qqqThreshold, r >= corrThreshold
+ *  NEUTRAL     : selain itu
+ * ===================================================================== */
+function classifySignal(stock, bench, cfg) {
+  const q = bench.return_15m;
+  const r = stock.correlation;
+  if (q > cfg.qqqThreshold && r >= cfg.corrThreshold) return stock.return_15m < cfg.lagThreshold ? 'BUY_LAGGING' : 'MOMENTUM';
+  if (q < -cfg.qqqThreshold && r >= cfg.corrThreshold) return 'AVOID';
+  return 'NEUTRAL';
+}
+
+function explainSignal(stock, bench, cfg, signal) {
+  const q = bench.return_15m;
+  const r = stock.correlation;
+  switch (signal) {
+    case 'BUY_LAGGING':
+      return `QQQ naik ${fmtPct(q)} (> ${fmtPct(cfg.qqqThreshold)}) dan ${stock.ticker} berkorelasi kuat (r = ${r.toFixed(2)} ≥ ${cfg.corrThreshold.toFixed(2)}), `
+           + `tetapi return 15m saham baru ${fmtPct(stock.return_15m)} (< ${fmtPct(cfg.lagThreshold)}). Berpotensi menyusul (catch-up).`;
+    case 'MOMENTUM':
+      return `QQQ naik ${fmtPct(q)} dan ${stock.ticker} sudah bergerak searah (${fmtPct(stock.return_15m)} ≥ ${fmtPct(cfg.lagThreshold)}) dengan korelasi r = ${r.toFixed(2)}. Peluang menyusul sudah berkurang.`;
+    case 'AVOID':
+      return `QQQ turun ${fmtPct(q)} (< -${cfg.qqqThreshold.toFixed(2)}%) dan ${stock.ticker} berkorelasi kuat (r = ${r.toFixed(2)}). Risiko ikut tertekan; hindari entri long.`;
+    default: {
+      const reasons = [];
+      if (Math.abs(q) <= cfg.qqqThreshold) reasons.push(`QQQ belum bergerak signifikan (${fmtPct(q)}, ambang ±${cfg.qqqThreshold.toFixed(2)}%)`);
+      if (r < cfg.corrThreshold) reasons.push(`korelasi ${r.toFixed(2)} di bawah ambang ${cfg.corrThreshold.toFixed(2)}`);
+      if (!reasons.length) reasons.push('QQQ bergerak signifikan tetapi arahnya tidak memenuhi aturan');
+      return 'Tidak ada sinyal: ' + reasons.join('; ') + '.';
+    }
+  }
+}
+
+function computeSignals() {
+  if (!state.data) return [];
+  return state.data.stocks
+    .map((s) => Object.assign({}, s, { signal: classifySignal(s, state.data.benchmark, state.cfg) }))
+    .sort((a, b) => (SIGNALS[a.signal].order - SIGNALS[b.signal].order) || (b.correlation - a.correlation));
+}
+
+/* =====================================================================
+ *  DATA: LIVE (SUPABASE EDGE FUNCTION, mode baca snapshot)
+ *  {
+ *    "timestamp": "2026-10-28T15:30:00Z",     // waktu bar terakhir
+ *    "generated_at": "2026-10-28T15:31:04Z",  // waktu snapshot dihitung
+ *    "market_open": true, "fresh": true,
+ *    "benchmark": { "ticker": "QQQ", "return_15m": 0.31, "price": 512.3, "volume": 1200000 },
+ *    "stocks": [ { "ticker": "NVDA", "correlation": 0.88, "corr_samples": 48, "return_15m": 0.04,
+ *                  "price": 145.2, "volume": 3200000, "atr": 0.45, "stop_loss": 143.9, "take_profit": 147.4 } ],
+ *    "skipped": [ { "ticker": "SMCI", "reason": "..." } ],
+ *    "config": { "qqq_min_return": 0.2, "corr_min": 0.75, "lag_max_return": 0.1, "sl_pct": 0.9, "tp_pct": 1.5 }
+ *  }
+ * ===================================================================== */
+function normalizePayload(p) {
+  if (!p || typeof p !== 'object') throw new Error('Respons bukan objek JSON');
+  const b = p.benchmark;
+  if (!b || !isNum(toNum(b.return_15m))) throw new Error('Field benchmark.return_15m tidak valid');
+  if (!Array.isArray(p.stocks) || p.stocks.length === 0) throw new Error('Field stocks kosong atau tidak valid');
+
+  const stocks = p.stocks.map((s, i) => {
+    if (!s || typeof s.ticker !== 'string') throw new Error('stocks[' + i + '].ticker tidak valid');
+    const corr = toNum(s.correlation);
+    const ret = toNum(s.return_15m);
+    if (!isNum(corr) || !isNum(ret)) throw new Error('stocks[' + i + '] (' + s.ticker + ') correlation/return_15m tidak valid');
+    return {
+      ticker: s.ticker.toUpperCase().slice(0, 10),
+      correlation: clamp(corr, -1, 1),
+      corr_samples: optNum(s.corr_samples),
+      return_15m: ret,
+      price: optNum(s.price),
+      volume: optNum(s.volume),
+      atr: optNum(s.atr),
+      stop_loss: optNum(s.stop_loss),
+      take_profit: optNum(s.take_profit)
+    };
+  });
+
+  let ts = new Date(p.timestamp);
+  if (isNaN(ts.getTime())) ts = new Date();
+  let gen = new Date(p.generated_at);
+  if (isNaN(gen.getTime())) gen = ts;
+
+  const c = p.config && typeof p.config === 'object' ? p.config : null;
+  return {
+    timestamp: ts.toISOString(),
+    generated_at: gen.toISOString(),
+    market_open: typeof p.market_open === 'boolean' ? p.market_open : getMarketStatus().open,
+    fresh: typeof p.fresh === 'boolean' ? p.fresh : true,
+    benchmark: {
+      ticker: typeof b.ticker === 'string' ? b.ticker.toUpperCase() : BENCHMARK,
+      return_15m: toNum(b.return_15m),
+      price: optNum(b.price),
+      volume: optNum(b.volume)
+    },
+    stocks,
+    skipped: Array.isArray(p.skipped) ? p.skipped.filter((x) => x && typeof x.ticker === 'string').map((x) => ({ ticker: x.ticker, reason: String(x.reason || '') })) : [],
+    config: c ? { qqq: optNum(c.qqq_min_return), corr: optNum(c.corr_min), lag: optNum(c.lag_max_return), sl: optNum(c.sl_pct), tp: optNum(c.tp_pct) } : null
+  };
+}
+
+async function fetchLiveDataFromSupabase() {
+  const { json } = await fetchJsonTimeout(SUPABASE_FUNCTION_URL, { method: 'GET', headers: authHeaders() });
+  return normalizePayload(json);
+}
+
+/* =====================================================================
+ *  DATA: SIMULASI (FALLBACK)
+ * ===================================================================== */
+function fallbackMockData() {
+  const base = [
+    { ticker: 'NVDA', corr: 0.88, price: 145.20 },
+    { ticker: 'AMD',  corr: 0.82, price: 162.45 },
+    { ticker: 'TSM',  corr: 0.79, price: 188.30 },
+    { ticker: 'SMCI', corr: 0.66, price: 41.75 },
+    { ticker: 'AAPL', corr: 0.84, price: 228.10 },
+    { ticker: 'MSFT', corr: 0.91, price: 421.60 }
+  ];
+
+  const dice = Math.random();
+  let qqq;
+  if (dice < 0.70) qqq = rand(0.22, 0.60);
+  else if (dice < 0.85) qqq = rand(-0.12, 0.15);
+  else qqq = -rand(0.25, 0.55);
+
+  const stocks = base.map((b) => {
+    const corr = clamp(b.corr + rand(-0.06, 0.06), -1, 1);
+    const lagging = Math.random() < 0.4;
+    const ret = lagging ? rand(-0.15, 0.08) : qqq * rand(0.6, 1.6) + rand(-0.05, 0.1);
+    const price = b.price * (1 + rand(-0.01, 0.01));
+    return {
+      ticker: b.ticker,
+      correlation: Number(corr.toFixed(2)),
+      corr_samples: 48,
+      return_15m: Number(ret.toFixed(2)),
+      price: Number(price.toFixed(2)),
+      volume: Math.round(rand(0.8e6, 9e6)),
+      atr: Number((price * rand(0.002, 0.006)).toFixed(2)),
+      stop_loss: Number((price * (1 - DEFAULT_SL_PCT / 100)).toFixed(2)),
+      take_profit: Number((price * (1 + DEFAULT_TP_PCT / 100)).toFixed(2))
+    };
+  });
+
+  // Pastikan ada contoh BUY LAGGING saat QQQ naik, agar UI mudah diuji
+  if (qqq > state.cfg.qqqThreshold && !stocks.some((s) => s.correlation >= state.cfg.corrThreshold && s.return_15m < state.cfg.lagThreshold)) {
+    stocks[0].correlation = 0.88;
+    stocks[0].return_15m = Number(rand(-0.05, 0.06).toFixed(2));
+  }
+  if (Math.random() < 0.3) stocks[3].correlation = Number(rand(-0.4, 0.2).toFixed(2));
+
+  const now = new Date().toISOString();
+  return normalizePayload({
+    timestamp: now,
+    generated_at: now,
+    market_open: getMarketStatus().open,
+    fresh: true,
+    benchmark: { ticker: BENCHMARK, return_15m: Number(qqq.toFixed(2)), price: Number((512 * (1 + rand(-0.005, 0.005))).toFixed(2)), volume: Math.round(rand(2e6, 6e6)) },
+    stocks,
+    skipped: [{ ticker: 'AMZN', reason: 'contoh simulasi: sampel korelasi < 20' }]
+  });
+}
+
+/* =====================================================================
+ *  RIWAYAT SINYAL (PostgREST: tabel signal_logs)
+ * ===================================================================== */
+function normalizeLog(r) {
+  const status = String(r.ai_status || 'PASSED').toUpperCase();
+  return {
+    id: r.id,
+    created_at: new Date(r.created_at),
+    ticker: String(r.ticker || '?').toUpperCase().slice(0, 10),
+    qqq_return: optNum(r.qqq_return),
+    stock_return: optNum(r.stock_return),
+    correlation: optNum(r.correlation),
+    entry_price: optNum(r.entry_price),
+    stop_loss: optNum(r.stop_loss),
+    take_profit: optNum(r.take_profit),
+    ai_status: GUARD[status] ? status : 'BYPASSED',
+    ai_reason: String(r.ai_reason || '')
+  };
+}
+
+async function fetchSignalHistory() {
+  const url = SUPABASE_URL + '/rest/v1/signal_logs?select=*&order=created_at.desc&limit=' + HISTORY_LIMIT;
+  const headers = Object.assign(authHeaders(), { 'Prefer': 'count=exact' });
+  const { res, json } = await fetchJsonTimeout(url, { method: 'GET', headers });
+  if (!Array.isArray(json)) throw new Error('Respons riwayat bukan array');
+  const m = /\/(\d+)$/.exec(res.headers.get('content-range') || '');
+  return { rows: json.map(normalizeLog), total: m ? parseInt(m[1], 10) : json.length };
+}
+
+function mockHistory() {
+  const now = Date.now();
+  const mk = (minAgo, tk, q, s, r, entry, st, why) => normalizeLog({
+    id: tk + minAgo, created_at: new Date(now - minAgo * 60000).toISOString(), ticker: tk, qqq_return: q, stock_return: s, correlation: r,
+    entry_price: entry, stop_loss: Number((entry * 0.991).toFixed(2)), take_profit: Number((entry * 1.015).toFixed(2)), ai_status: st, ai_reason: why
+  });
+  return {
+    rows: [
+      mk(12, 'NVDA', 0.31, -0.04, 0.88, 145.2, 'PASSED', 'Tidak ada berita buruk'),
+      mk(47, 'AAPL', 0.28, 0.06, 0.84, 228.1, 'REJECTED', 'Investigasi regulator terhadap penjualan'),
+      mk(95, 'AMD', 0.35, 0.02, 0.8, 162.45, 'NO_NEWS', 'Tidak ada berita 24 jam terakhir'),
+      mk(140, 'TSM', 0.26, 0.0, 0.79, 188.3, 'BYPASSED', 'Guardrail gagal: timeout')
+    ],
+    total: 4
+  };
+}
+
+/* =====================================================================
+ *  ALERT
+ * ===================================================================== */
+function showAlert(msg, type = 'warning') {
+  $('alertBox').innerHTML =
+    '<div class="alert alert-' + type + ' alert-dismissible fade show py-2 small" role="alert">' + escapeHtml(msg) +
+    '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>';
+}
+function clearAlert() { $('alertBox').innerHTML = ''; }
+
+/* =====================================================================
+ *  REFRESH
+ * ===================================================================== */
+function setLoading(on) {
+  state.loading = on;
+  $('btnRefresh').disabled = on;
+  $('btnSpinner').classList.toggle('d-none', !on);
+  $('btnLabel').textContent = on ? 'Memuat...' : 'Refresh Data';
+}
+
+async function refreshSnapshot() {
+  if (!isUrlConfigured()) {
+    state.data = fallbackMockData();
+    state.mode = 'simulation';
+    showAlert('URL Supabase belum diisi. Menampilkan data simulasi agar UI dapat diuji.', 'info');
+    return;
+  }
+  try {
+    state.data = await fetchLiveDataFromSupabase();
+    state.mode = 'live';
+    clearAlert();
+  } catch (e) {
+    state.data = fallbackMockData();
+    state.mode = 'simulation';
+    showAlert('Gagal mengambil data live (' + e.message + '). Menampilkan data simulasi.', 'warning');
+  }
+}
+
+async function refreshHistory() {
+  if (!isDbConfigured()) {
+    const m = mockHistory();
+    state.history = { rows: m.rows, total: m.total, mode: 'simulation', error: null };
+    return;
+  }
+  try {
+    const h = await fetchSignalHistory();
+    state.history = { rows: h.rows, total: h.total, mode: 'live', error: null };
+  } catch (e) {
+    state.history = { rows: [], total: null, mode: 'live', error: e.message };
+  }
+}
+
+async function refreshData() {
+  if (state.loading) return;
+  setLoading(true);
+  try {
+    await Promise.all([refreshSnapshot(), refreshHistory()]);
+    state.lastRefreshAt = Date.now();
+    renderAll();
+  } finally {
+    setLoading(false);
+  }
+}
+
+/* =====================================================================
+ *  RENDER: STATUS BAR
+ * ===================================================================== */
+function updateStatusBar() {
+  const now = new Date();
+  const market = getMarketStatus(now);
+  const mb = $('marketBadge');
+  mb.className = 'badge ' + (market.open ? 'text-bg-success' : 'text-bg-secondary');
+  mb.textContent = (market.open ? 'Pasar AS Buka' : 'Pasar AS Tutup') + ' · NY ' + market.nyTime;
+
+  const sb = $('statusBadge');
+  const lu = $('lastUpdated');
+  if (!state.data) {
+    sb.className = 'badge text-bg-secondary';
+    sb.textContent = 'Memuat...';
+    lu.textContent = 'Last updated: -';
+    return;
+  }
+
+  const gen = new Date(state.data.generated_at);
+  const ageMs = now.getTime() - gen.getTime();
+  const ageSec = Math.max(0, Math.round(ageMs / 1000));
+  const ageTxt = ageSec < 60 ? ageSec + ' dtk lalu' : Math.round(ageSec / 60) + ' mnt lalu';
+
+  if (state.mode === 'live') {
+    const stale = market.open && (ageMs > STALE_AFTER_MS || state.data.fresh === false);
+    sb.className = 'badge ' + (stale ? 'text-bg-danger' : 'text-bg-success') + (stale ? '' : ' pulse');
+    sb.textContent = stale ? 'Live Data (STALE)' : 'Live Data';
+  } else {
+    sb.className = 'badge text-bg-warning';
+    sb.textContent = 'Simulation';
+  }
+  lu.textContent = 'Last updated: ' + fmtWibTime(gen) + ' WIB (' + ageTxt + ') · bar ' + fmtWibTime(new Date(state.data.timestamp), false);
+}
+
+/* =====================================================================
+ *  RENDER: GRAPH (RADIAL, POSISI TETAP)
+ * ===================================================================== */
+function initNetwork() {
+  nodesDS = new vis.DataSet();
+  edgesDS = new vis.DataSet();
+  network = new vis.Network($('graph'), { nodes: nodesDS, edges: edgesDS }, {
+    physics: false,
+    interaction: { hover: true, dragNodes: false, zoomView: true, dragView: true, tooltipDelay: 80 },
+    nodes: { shape: 'dot', borderWidth: 2, font: { color: '#ffffff', size: 14, face: 'system-ui, sans-serif' } },
+    edges: { smooth: false, font: { color: '#b5b5ba', size: 11, strokeWidth: 0, align: 'middle' } }
+  });
+  network.on('click', (params) => {
+    if (params.nodes.length && params.nodes[0] !== BENCHMARK) selectTicker(params.nodes[0]);
+  });
+  // Setelah pengguna zoom/geser, jangan paksa fit lagi saat data diperbarui
+  network.on('zoom', () => { userMovedView = true; });
+  network.on('dragEnd', (p) => { if (!p.nodes.length) userMovedView = true; });
+  window.addEventListener('resize', () => { if (network && !userMovedView) network.fit({ animation: false }); });
+}
+
+function renderGraph(rows) {
+  const bench = state.data.benchmark;
+  const n = rows.length;
+  const nodes = [];
+  const edges = [];
+
+  nodes.push({
+    id: BENCHMARK,
+    label: bench.ticker + '\n' + fmtPct(bench.return_15m),
+    title: bench.ticker + ' (Benchmark)\nReturn 15m: ' + fmtPct(bench.return_15m),
+    x: 0, y: 0, fixed: true, size: 38,
+    color: { background: COLORS.blue, border: '#93b8ff', highlight: { background: COLORS.blue, border: '#fff' }, hover: { background: COLORS.blue, border: '#fff' } },
+    font: { color: '#ffffff', size: 16, bold: true }
+  });
+
+  rows.forEach((s, i) => {
+    const meta = SIGNALS[s.signal];
+    const angle = (2 * Math.PI * i) / Math.max(n, 1) - Math.PI / 2;
+    const absR = clamp(Math.abs(s.correlation), 0, 1);
+    const radius = 170 + (1 - absR) * 230;   // korelasi tinggi = dekat ke hub
+    const isSel = state.selected === s.ticker;
+    const isBuy = s.signal === 'BUY_LAGGING';
+
+    nodes.push({
+      id: s.ticker,
+      label: s.ticker + '\n' + fmtPct(s.return_15m),
+      title: s.ticker + '\nKorelasi: ' + s.correlation.toFixed(2) + '\nReturn 15m: ' + fmtPct(s.return_15m) + '\nSinyal: ' + meta.label,
+      x: Math.cos(angle) * radius,
+      y: Math.sin(angle) * radius,
+      fixed: true,
+      size: isBuy ? 28 : 22,
+      borderWidth: isSel ? 5 : (isBuy ? 4 : 2),
+      color: {
+        background: meta.color,
+        border: isSel ? '#ffffff' : (isBuy ? '#fff3c4' : 'rgba(255,255,255,0.35)'),
+        highlight: { background: meta.color, border: '#ffffff' },
+        hover: { background: meta.color, border: '#ffffff' }
+      },
+      shadow: isBuy ? { enabled: true, color: 'rgba(255,193,7,0.65)', size: 22, x: 0, y: 0 } : { enabled: false }
+    });
+
+    edges.push({
+      id: 'e-' + s.ticker,
+      from: BENCHMARK,
+      to: s.ticker,
+      width: 1 + absR * 9,
+      dashes: s.correlation < 0,
+      label: 'r=' + s.correlation.toFixed(2),
+      title: BENCHMARK + ' ↔ ' + s.ticker + '\nr = ' + s.correlation.toFixed(3),
+      color: { color: meta.color, highlight: meta.color, hover: meta.color, opacity: s.signal === 'NEUTRAL' ? 0.55 : 0.95 }
+    });
+  });
+
+  nodesDS.clear();
+  edgesDS.clear();
+  nodesDS.add(nodes);
+  edgesDS.add(edges);
+  if (!userMovedView) setTimeout(() => network.fit({ animation: false }), 30);
+}
+
+/* =====================================================================
+ *  RENDER: TABEL SINYAL
+ * ===================================================================== */
+function levelsOf(s) {
+  const cfg = state.data && state.data.config;
+  const slPct = cfg && isNum(cfg.sl) ? cfg.sl : DEFAULT_SL_PCT;
+  const tpPct = cfg && isNum(cfg.tp) ? cfg.tp : DEFAULT_TP_PCT;
+  if (!isNum(s.price)) return null;
+  return {
+    sl: isNum(s.stop_loss) ? s.stop_loss : s.price * (1 - slPct / 100),
+    tp: isNum(s.take_profit) ? s.take_profit : s.price * (1 + tpPct / 100)
+  };
+}
+
+function renderTable(rows) {
+  const counts = { BUY_LAGGING: 0, MOMENTUM: 0, AVOID: 0, NEUTRAL: 0 };
+  $('signalBody').innerHTML = rows.map((s) => {
+    counts[s.signal]++;
+    const meta = SIGNALS[s.signal];
+    const lv = levelsOf(s);
+    const sltp = (s.signal === 'BUY_LAGGING' && lv)
+      ? '<span class="neg">' + lv.sl.toFixed(2) + '</span> / <span class="pos">' + lv.tp.toFixed(2) + '</span>'
+      : '<span class="text-muted-dss">-</span>';
+    const cls = ['clickable', s.signal === 'BUY_LAGGING' ? 'row-buy' : '', state.selected === s.ticker ? 'selected' : ''].join(' ').trim();
+    return '<tr class="' + cls + '" data-ticker="' + escapeHtml(s.ticker) + '">' +
+      '<td class="ticker-cell">' + escapeHtml(s.ticker) + '</td>' +
+      '<td class="text-end">' + fmtPrice(s.price) + '</td>' +
+      '<td class="text-end">' + s.correlation.toFixed(2) + '</td>' +
+      '<td class="text-end ' + pctClass(s.return_15m) + '">' + fmtPct(s.return_15m) + '</td>' +
+      '<td class="text-end text-muted-dss">' + fmtVolume(s.volume) + '</td>' +
+      '<td><span class="badge badge-signal ' + meta.badge + '">' + meta.label + '</span></td>' +
+      '<td class="text-end">' + sltp + '</td></tr>';
+  }).join('');
+
+  $('signalSummary').innerHTML =
+    '<span class="badge badge-buy me-1">BUY ' + counts.BUY_LAGGING + '</span>' +
+    '<span class="badge badge-momentum me-1">MOM ' + counts.MOMENTUM + '</span>' +
+    '<span class="badge badge-avoid me-1">AVOID ' + counts.AVOID + '</span>' +
+    '<span class="badge badge-neutral">NEU ' + counts.NEUTRAL + '</span>';
+
+  const sk = state.data.skipped;
+  $('skippedNote').innerHTML = sk.length
+    ? 'Dilewati (data belum cukup): ' + sk.map((x) => '<strong>' + escapeHtml(x.ticker) + '</strong> (' + escapeHtml(x.reason) + ')').join(', ')
+    : '';
+
+  const c = state.data.config;
+  $('serverCfg').textContent = c
+    ? 'Threshold server: QQQ > +' + (c.qqq ?? '-') + '% · r ≥ ' + (c.corr ?? '-') + ' · saham < +' + (c.lag ?? '-') + '% · SL -' + (c.sl ?? '-') + '% / TP +' + (c.tp ?? '-') + '%'
+    : '';
+}
+
+/* =====================================================================
+ *  RENDER: PANEL DETAIL
+ * ===================================================================== */
+function renderDetail(rows) {
+  const panel = $('detailPanel');
+  const s = rows.find((r) => r.ticker === state.selected);
+  if (!s) {
+    panel.innerHTML = '<p class="text-muted-dss mb-0">Klik sebuah node di graph atau baris di tabel untuk melihat detail dan alasan sinyal.</p>';
+    return;
+  }
+  const meta = SIGNALS[s.signal];
+  const bench = state.data.benchmark;
+  const gap = s.return_15m - bench.return_15m;
+  const lv = levelsOf(s);
+  let levels = '';
+  if (lv) {
+    const slPct = (lv.sl / s.price - 1) * 100, tpPct = (lv.tp / s.price - 1) * 100;
+    levels =
+      '<div class="col-6"><div class="small-label">Stop-loss (' + fmtPct(slPct, 1) + ')</div><div class="detail-value neg">' + lv.sl.toFixed(2) + '</div></div>' +
+      '<div class="col-6"><div class="small-label">Take-profit (' + fmtPct(tpPct, 1) + ')</div><div class="detail-value pos">' + lv.tp.toFixed(2) + '</div></div>' +
+      '<div class="col-6"><div class="small-label">Rasio R:R</div><div class="detail-value">1 : ' + (tpPct / Math.abs(slPct)).toFixed(1) + '</div></div>' +
+      '<div class="col-6"><div class="small-label">ATR (5m, 14 bar)</div><div class="detail-value">' + (isNum(s.atr) ? s.atr.toFixed(2) : '-') + '</div></div>';
+  }
+  panel.innerHTML =
+    '<div class="d-flex justify-content-between align-items-center mb-3">' +
+      '<span class="fs-4 fw-bold">' + escapeHtml(s.ticker) + '</span>' +
+      '<span class="badge badge-signal ' + meta.badge + '">' + meta.label + '</span></div>' +
+    '<div class="row g-3 mb-3">' +
+      '<div class="col-6"><div class="small-label">Harga</div><div class="detail-value">' + fmtPrice(s.price) + '</div></div>' +
+      '<div class="col-6"><div class="small-label">Volume 15m</div><div class="detail-value">' + fmtVolume(s.volume) + '</div></div>' +
+      '<div class="col-6"><div class="small-label">Korelasi ke ' + escapeHtml(bench.ticker) + '</div><div class="detail-value">' + s.correlation.toFixed(3) +
+        (isNum(s.corr_samples) ? ' <span class="tiny text-muted-dss">n=' + s.corr_samples + '</span>' : '') + '</div></div>' +
+      '<div class="col-6"><div class="small-label">Return 15m</div><div class="detail-value ' + pctClass(s.return_15m) + '">' + fmtPct(s.return_15m) + '</div></div>' +
+      '<div class="col-12"><div class="small-label">Selisih vs ' + escapeHtml(bench.ticker) + '</div><div class="detail-value ' + pctClass(gap) + '">' + fmtPct(gap) + '</div></div>' +
+      levels +
+    '</div>' +
+    '<div class="small text-muted-dss">' + escapeHtml(explainSignal(s, bench, state.cfg, s.signal)) + '</div>' +
+    (s.signal === 'BUY_LAGGING' && lv ? '<div class="small text-muted-dss mt-2 fst-italic">Level SL/TP hanya ilustrasi, bukan rekomendasi.</div>' : '');
+}
+
+/* =====================================================================
+ *  RENDER: RIWAYAT SINYAL
+ * ===================================================================== */
+function renderHistory() {
+  const h = state.history;
+  const tbody = $('historyBody');
+  $('historyMode').textContent = h.mode === 'simulation' ? '(simulasi: Supabase belum dikonfigurasi)' : '';
+
+  if (h.error) {
+    $('historySummary').innerHTML = '';
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger py-4">Gagal membaca riwayat: ' + escapeHtml(h.error) + '</td></tr>';
+    return;
+  }
+
+  const cnt = { PASSED: 0, NO_NEWS: 0, BYPASSED: 0, REJECTED: 0 };
+  h.rows.forEach((r) => { cnt[r.ai_status]++; });
+  $('historySummary').innerHTML =
+    '<span class="text-muted-dss me-2">Total ' + (isNum(h.total) ? h.total : h.rows.length) + ' (tampil ' + h.rows.length + ')</span>' +
+    Object.keys(GUARD).map((k) => '<span class="badge ' + GUARD[k].cls + ' me-1">' + GUARD[k].label + ' ' + cnt[k] + '</span>').join('');
+
+  if (!h.rows.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted-dss py-4">Belum ada sinyal tercatat. Jika yakin sudah ada, pastikan policy RLS baca untuk anon sudah dibuat (lihat migration.sql).</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = h.rows.map((r) => {
+    const g = GUARD[r.ai_status];
+    const pct = (v) => (isNum(v) && isNum(r.entry_price) && r.entry_price) ? ' <span class="tiny text-muted-dss">(' + fmtPct((v / r.entry_price - 1) * 100, 1) + ')</span>' : '';
+    return '<tr>' +
+      '<td class="text-muted-dss">' + escapeHtml(isNaN(r.created_at.getTime()) ? '-' : fmtWibDateTime(r.created_at)) + '</td>' +
+      '<td class="ticker-cell">' + escapeHtml(r.ticker) + '</td>' +
+      '<td class="text-end ' + pctClass(r.qqq_return) + '">' + fmtPct(r.qqq_return) + '</td>' +
+      '<td class="text-end ' + pctClass(r.stock_return) + '">' + fmtPct(r.stock_return) + '</td>' +
+      '<td class="text-end">' + (isNum(r.correlation) ? r.correlation.toFixed(2) : '-') + '</td>' +
+      '<td class="text-end">' + fmtPrice(r.entry_price) + '</td>' +
+      '<td class="text-end neg">' + (isNum(r.stop_loss) ? r.stop_loss.toFixed(2) : '-') + pct(r.stop_loss) + '</td>' +
+      '<td class="text-end pos">' + (isNum(r.take_profit) ? r.take_profit.toFixed(2) : '-') + pct(r.take_profit) + '</td>' +
+      '<td><span class="badge ' + g.cls + '" title="' + escapeHtml(r.ai_reason) + '">' + g.label + '</span>' +
+        (r.ai_reason ? ' <span class="tiny text-muted-dss d-none d-xl-inline">' + escapeHtml(r.ai_reason.slice(0, 60)) + '</span>' : '') + '</td></tr>';
+  }).join('');
+}
+
+/* =====================================================================
+ *  RENDER ALL
+ * ===================================================================== */
+function renderAll() {
+  if (state.data) {
+    const rows = computeSignals();
+    renderGraph(rows);
+    renderTable(rows);
+    renderDetail(rows);
+  }
+  renderHistory();
+  updateStatusBar();
+}
+
+function selectTicker(ticker) {
+  state.selected = ticker;
+  renderAll();
+}
+
+/* =====================================================================
+ *  PENGATURAN THRESHOLD (UI)
+ * ===================================================================== */
+function syncCfgLabels() {
+  $('lblQqq').textContent = '> +' + state.cfg.qqqThreshold.toFixed(2) + '%';
+  $('lblCorr').textContent = '≥ ' + state.cfg.corrThreshold.toFixed(2);
+  $('lblLag').textContent = '< +' + state.cfg.lagThreshold.toFixed(2) + '%';
+}
+function syncCfgInputs() {
+  $('rngQqq').value = state.cfg.qqqThreshold;
+  $('rngCorr').value = state.cfg.corrThreshold;
+  $('rngLag').value = state.cfg.lagThreshold;
+  syncCfgLabels();
+}
+function bindCfgInputs() {
+  const bind = (id, key) => {
+    $(id).addEventListener('input', (e) => {
+      state.cfg[key] = parseFloat(e.target.value);
+      syncCfgLabels();
+      saveCfg();
+      renderAll();
+    });
+  };
+  bind('rngQqq', 'qqqThreshold');
+  bind('rngCorr', 'corrThreshold');
+  bind('rngLag', 'lagThreshold');
+  $('btnResetCfg').addEventListener('click', () => {
+    state.cfg = Object.assign({}, DEFAULT_CFG);
+    saveCfg();
+    syncCfgInputs();
+    renderAll();
+  });
+}
+
+/* =====================================================================
+ *  INISIALISASI
+ * ===================================================================== */
+document.addEventListener('DOMContentLoaded', () => {
+  initNetwork();
+  syncCfgInputs();
+  bindCfgInputs();
+
+  $('btnRefresh').addEventListener('click', refreshData);
+  $('btnResetView').addEventListener('click', () => { userMovedView = false; if (network) network.fit({ animation: false }); });
+
+  $('signalBody').addEventListener('click', (e) => {
+    const tr = e.target.closest('tr[data-ticker]');
+    if (tr) selectTicker(tr.getAttribute('data-ticker'));
+  });
+
+  // Auto refresh: lewati saat tab tersembunyi; saat tab kembali terlihat, segarkan jika data sudah > 30 dtk
+  setInterval(() => { if ($('autoRefresh').checked && !document.hidden) refreshData(); }, REFRESH_INTERVAL_MS);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && $('autoRefresh').checked && Date.now() - state.lastRefreshAt > 30000) refreshData();
+  });
+
+  // Perbarui umur data & jam pasar tiap detik
+  setInterval(updateStatusBar, 1000);
+
+  updateStatusBar();
+  refreshData();
+});
+</script>
 </body>
 </html>
