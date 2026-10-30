@@ -17,6 +17,7 @@
       --gray: #6c757d;
       --red: #ea5455;
       --blue: #3b82f6;
+      --purple: #a855f7;
     }
     html, body { background: var(--bg); color: #e6e6e6; min-height: 100%; }
     .navbar-dss { background: #181818; border-bottom: 1px solid var(--card-border); }
@@ -36,18 +37,24 @@
     .ticker-cell { font-weight: 700; letter-spacing: .02em; }
     .pos { color: var(--green); }
     .neg { color: var(--red); }
+    .zlag { color: var(--yellow); font-weight: 600; }
+    .zdiv { color: var(--purple); font-weight: 600; }
     .badge-signal { font-size: .75rem; padding: .4em .7em; letter-spacing: .03em; }
     .badge-buy { background: var(--yellow); color: #1a1a1a; }
     .badge-momentum { background: var(--green); color: #07210f; }
     .badge-neutral { background: var(--gray); color: #fff; }
     .badge-avoid { background: var(--red); color: #fff; }
+    .badge-divergent { background: var(--purple); color: #fff; }
     .text-muted-dss { color: var(--muted); }
     .small-label { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
     .detail-value { font-size: 1.05rem; font-weight: 600; }
+    .kpi { background: #222225; border: 1px solid var(--card-border); border-radius: 10px; padding: .65rem .8rem; height: 100%; }
+    .kpi .v { font-size: 1.25rem; font-weight: 700; }
     .form-range::-webkit-slider-runnable-track { background: #2c2c2e; }
     .pulse { animation: pulse 1.6s infinite; }
     @keyframes pulse { 0% { opacity: 1; } 50% { opacity: .45; } 100% { opacity: 1; } }
     .tiny { font-size: .75rem; }
+    .nc { text-transform: none !important; }   /* cegah β/σ berubah jadi huruf kapital di label uppercase */
   </style>
 </head>
 <body>
@@ -88,22 +95,26 @@
     <div id="settingsBody" class="collapse">
       <div class="card-body">
         <div class="row g-4">
-          <div class="col-md-4">
+          <div class="col-md-6 col-xl-3">
             <label for="rngQqq" class="form-label small-label">Return 15m QQQ minimal (%) &mdash; <span id="lblQqq" class="text-light"></span></label>
             <input type="range" class="form-range" id="rngQqq" min="0.05" max="1" step="0.05">
           </div>
-          <div class="col-md-4">
+          <div class="col-md-6 col-xl-3">
             <label for="rngCorr" class="form-label small-label">Korelasi minimal (r) &mdash; <span id="lblCorr" class="text-light"></span></label>
             <input type="range" class="form-range" id="rngCorr" min="0.3" max="0.95" step="0.05">
           </div>
-          <div class="col-md-4">
-            <label for="rngLag" class="form-label small-label">Batas "tertinggal": return saham &lt; (%) &mdash; <span id="lblLag" class="text-light"></span></label>
-            <input type="range" class="form-range" id="rngLag" min="0" max="0.5" step="0.05">
+          <div class="col-md-6 col-xl-3">
+            <label for="rngZLag" class="form-label small-label">Lag z untuk BUY (tertinggal) &mdash; <span id="lblZLag" class="text-light"></span></label>
+            <input type="range" class="form-range" id="rngZLag" min="0.5" max="2.5" step="0.1">
+          </div>
+          <div class="col-md-6 col-xl-3">
+            <label for="rngZDiv" class="form-label small-label">Lag z untuk DIVERGENT &mdash; <span id="lblZDiv" class="text-light"></span></label>
+            <input type="range" class="form-range" id="rngZDiv" min="1.5" max="5" step="0.25">
           </div>
         </div>
         <div class="d-flex flex-wrap align-items-center gap-3 mt-3">
-          <button id="btnResetCfg" class="btn btn-sm btn-outline-secondary" type="button">Reset ke default (0.2% / 0.75 / 0.1%)</button>
-          <span class="tiny text-muted-dss">Slider ini hanya mengubah tampilan di browser Anda. Alert Telegram dan catatan riwayat memakai threshold di server.</span>
+          <button id="btnResetCfg" class="btn btn-sm btn-outline-secondary" type="button">Reset ke default (0.2% / 0.75 / z -1.0 / z -3.0)</button>
+          <span class="tiny text-muted-dss">Lag z = (return saham &minus; β &times; return QQQ) &divide; simpangan residual 15m. Slider ini hanya mengubah tampilan di browser Anda; alert Telegram dan riwayat memakai threshold server.</span>
         </div>
         <div id="serverCfg" class="tiny text-muted-dss mt-2"></div>
       </div>
@@ -119,6 +130,7 @@
           <span class="small text-muted-dss">
             <span class="legend-dot" style="background:var(--green)"></span>Synced/Momentum
             <span class="legend-dot ms-2" style="background:var(--yellow)"></span>Lagging (BUY)
+            <span class="legend-dot ms-2" style="background:var(--purple)"></span>Divergent
             <span class="legend-dot ms-2" style="background:var(--gray)"></span>Neutral
             <span class="legend-dot ms-2" style="background:var(--red)"></span>Avoid
           </span>
@@ -157,8 +169,11 @@
           <tr>
             <th>Ticker</th>
             <th class="text-end">Harga</th>
-            <th class="text-end">Korelasi (r)</th>
+            <th class="text-end">r</th>
+            <th class="text-end nc">β</th>
             <th class="text-end">Return 15m</th>
+            <th class="text-end">Ekspektasi</th>
+            <th class="text-end">Lag z</th>
             <th class="text-end">Volume 15m</th>
             <th>Sinyal</th>
             <th class="text-end">SL / TP</th>
@@ -168,6 +183,38 @@
       </table>
     </div>
     <div id="skippedNote" class="tiny text-muted-dss px-3 py-2"></div>
+  </div>
+
+  <!-- ========== KINERJA SINYAL ========== -->
+  <div class="card card-dss mb-3">
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <span>Kinerja Sinyal <span id="perfMode" class="tiny text-muted-dss"></span></span>
+      <span class="tiny text-muted-dss">Sinyal tertutup (TP / SL / batas waktu). Simulasi dari bar 5 menit, belum termasuk komisi &amp; slippage.</span>
+    </div>
+    <div class="card-body">
+      <div id="perfWarn"></div>
+      <div id="perfKpi" class="row g-2 mb-3"></div>
+      <div class="row g-3">
+        <div class="col-lg-6">
+          <div class="small-label mb-1">Per kelompok</div>
+          <div class="table-responsive">
+            <table class="table table-dss table-sm align-middle">
+              <thead><tr><th>Kelompok</th><th class="text-end">N</th><th class="text-end">Win</th><th class="text-end">Rata²</th><th class="text-end">Total</th><th class="text-end">TP/SL/TO</th></tr></thead>
+              <tbody id="perfGroups"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="small-label mb-1">Per ticker</div>
+          <div class="table-responsive">
+            <table class="table table-dss table-sm align-middle">
+              <thead><tr><th>Ticker</th><th class="text-end">N</th><th class="text-end">Win</th><th class="text-end">Rata²</th><th class="text-end">Total</th><th class="text-end">TP/SL/TO</th></tr></thead>
+              <tbody id="perfTickers"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- ========== RIWAYAT SINYAL (SUPABASE signal_logs) ========== -->
@@ -184,11 +231,12 @@
             <th>Ticker</th>
             <th class="text-end">QQQ 15m</th>
             <th class="text-end">Saham 15m</th>
-            <th class="text-end">r</th>
+            <th class="text-end">Lag z</th>
             <th class="text-end">Entry</th>
             <th class="text-end">SL</th>
             <th class="text-end">TP</th>
             <th>Guardrail AI</th>
+            <th>Hasil</th>
           </tr>
         </thead>
         <tbody id="historyBody"></tbody>
@@ -199,7 +247,7 @@
   <div class="text-muted-dss small pb-4">
     <strong>Disclaimer:</strong> Dashboard ini adalah alat bantu keputusan (Decision Support System) untuk tujuan edukasi dan analisis, bukan saran investasi.
     Sinyal bersifat statistik dan dapat salah. Data berbasis bar 5 menit dan diperbarui tiap beberapa menit, bukan tick real-time. Day trading berisiko tinggi;
-    gunakan manajemen risiko Anda sendiri. Level SL/TP hanyalah ilustrasi.
+    gunakan manajemen risiko Anda sendiri. Level SL/TP hanyalah ilustrasi, dan kinerja historis tidak menjamin hasil di masa depan.
   </div>
 </main>
 
@@ -218,19 +266,22 @@ const REFRESH_INTERVAL_MS = 60000;   // auto refresh (hanya membaca snapshot, ti
 const FETCH_TIMEOUT_MS    = 10000;
 const STALE_AFTER_MS      = 480000;  // scan berjalan tiap 5 menit; > 8 menit saat pasar buka dianggap basi
 const HISTORY_LIMIT       = 30;
+const PERF_LIMIT          = 1000;    // jumlah sinyal tertutup terakhir untuk statistik kinerja
+const PERF_MIN_SAMPLE     = 30;
 const DEFAULT_SL_PCT = 0.9;          // hanya dipakai jika server tidak mengirim stop_loss/take_profit
 const DEFAULT_TP_PCT = 1.5;
 
-const DEFAULT_CFG = { qqqThreshold: 0.2, corrThreshold: 0.75, lagThreshold: 0.1 };
-const CFG_STORAGE_KEY = 'stockSnaDss.cfg.v1';
+const DEFAULT_CFG = { qqqThreshold: 0.2, corrThreshold: 0.75, zLag: 1.0, zDiv: 3.0 };
+const CFG_STORAGE_KEY = 'stockSnaDss.cfg.v3';
 
-const COLORS = { green: '#28c76f', yellow: '#ffc107', gray: '#6c757d', red: '#ea5455', blue: '#3b82f6' };
+const COLORS = { green: '#28c76f', yellow: '#ffc107', gray: '#6c757d', red: '#ea5455', blue: '#3b82f6', purple: '#a855f7' };
 
 const SIGNALS = {
-  BUY_LAGGING: { label: 'BUY LAGGING', badge: 'badge-buy',      color: COLORS.yellow, order: 0 },
-  MOMENTUM:    { label: 'MOMENTUM',    badge: 'badge-momentum', color: COLORS.green,  order: 1 },
-  AVOID:       { label: 'AVOID',       badge: 'badge-avoid',    color: COLORS.red,    order: 2 },
-  NEUTRAL:     { label: 'NEUTRAL',     badge: 'badge-neutral',  color: COLORS.gray,   order: 3 }
+  BUY_LAGGING: { label: 'BUY LAGGING', badge: 'badge-buy',       color: COLORS.yellow, order: 0 },
+  MOMENTUM:    { label: 'MOMENTUM',    badge: 'badge-momentum',  color: COLORS.green,  order: 1 },
+  DIVERGENT:   { label: 'DIVERGENT',   badge: 'badge-divergent', color: COLORS.purple, order: 2 },
+  AVOID:       { label: 'AVOID',       badge: 'badge-avoid',     color: COLORS.red,    order: 3 },
+  NEUTRAL:     { label: 'NEUTRAL',     badge: 'badge-neutral',   color: COLORS.gray,   order: 4 }
 };
 
 const GUARD = {
@@ -240,17 +291,27 @@ const GUARD = {
   REJECTED: { label: 'REJECTED', cls: 'text-bg-danger' }
 };
 
+const OUTCOME = {
+  OPEN:    { label: 'OPEN',    cls: 'text-bg-primary' },
+  TP:      { label: 'TP',      cls: 'text-bg-success' },
+  SL:      { label: 'SL',      cls: 'text-bg-danger' },
+  TIMEOUT: { label: 'TIMEOUT', cls: 'text-bg-secondary' },
+  EXPIRED: { label: 'EXPIRED', cls: 'text-bg-dark border border-secondary' }
+};
+
 /* =====================================================================
  *  STATE
  * ===================================================================== */
 const state = {
-  data: null,          // snapshot ternormalisasi
-  mode: 'simulation',  // 'live' | 'simulation'
+  data: null,          // snapshot ternormalisasi (live terakhir yang berhasil, atau simulasi)
+  mode: 'simulation',  // 'live' | 'simulation' | 'none'
+  liveError: null,     // pesan error refresh live terakhir; null jika refresh terakhir sukses
   selected: null,
   cfg: loadCfg(),
   loading: false,
   lastRefreshAt: 0,
-  history: { rows: [], total: null, mode: 'simulation', error: null }
+  history: { rows: [], total: null, mode: 'simulation', error: null },
+  perf: { rows: [], mode: 'simulation', error: null }
 };
 
 let network = null;
@@ -267,6 +328,7 @@ const toNum = (v) => (v === null || v === undefined || v === '') ? NaN : Number(
 const optNum = (v) => { const n = toNum(v); return isNum(n) ? n : null; };
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const rand = (lo, hi) => lo + Math.random() * (hi - lo);
+const rnd = (v, d) => Number(v.toFixed(d));
 
 function escapeHtml(str) {
   return String(str === null || str === undefined ? '' : str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -277,6 +339,8 @@ function fmtPct(v, d = 2) {
   if (!isNum(v)) return '-';
   return (v > 0 ? '+' : '') + v.toFixed(d) + '%';
 }
+function fmtNum(v, d = 2) { return isNum(v) ? v.toFixed(d) : '-'; }
+function fmtSigned(v, d = 2) { return isNum(v) ? (v > 0 ? '+' : '') + v.toFixed(d) : '-'; }
 function fmtPrice(v) { return isNum(v) ? '$' + v.toFixed(2) : '-'; }
 function fmtVolume(v) {
   if (!isNum(v)) return '-';
@@ -287,12 +351,23 @@ function fmtVolume(v) {
 }
 function pctClass(v) { return (!isNum(v) || v === 0) ? '' : (v > 0 ? 'pos' : 'neg'); }
 
+function effZDiv(cfg) { return Math.max(cfg.zDiv, cfg.zLag + 0.1); }
+function zClass(z, cfg) {
+  if (!isNum(z)) return '';
+  if (z <= -effZDiv(cfg)) return 'zdiv';
+  if (z <= -cfg.zLag) return 'zlag';
+  return z > 0 ? 'pos' : '';
+}
+
 function loadCfg() {
   try {
     const raw = localStorage.getItem(CFG_STORAGE_KEY);
     if (raw) {
+      // Gabungkan per kunci dengan default, supaya pengaturan yang tidak lengkap tetap terpakai
       const p = JSON.parse(raw);
-      if (isNum(p.qqqThreshold) && isNum(p.corrThreshold) && isNum(p.lagThreshold)) return p;
+      const out = Object.assign({}, DEFAULT_CFG);
+      Object.keys(DEFAULT_CFG).forEach((k) => { if (isNum(p[k])) out[k] = p[k]; });
+      return out;
     }
   } catch (e) { /* abaikan */ }
   return Object.assign({}, DEFAULT_CFG);
@@ -358,16 +433,25 @@ function fmtWibDateTime(date) {
 }
 
 /* =====================================================================
- *  DSS ENGINE
- *  BUY_LAGGING : QQQ > +qqqThreshold, r >= corrThreshold, saham < lagThreshold
- *  MOMENTUM    : QQQ > +qqqThreshold, r >= corrThreshold, saham >= lagThreshold
- *  AVOID       : QQQ < -qqqThreshold, r >= corrThreshold
- *  NEUTRAL     : selain itu
+ *  DSS ENGINE (lag disesuaikan beta)
+ *  ekspektasi = β × return 15m QQQ;  lag z = (return saham − ekspektasi) ÷ σ residual 15m
+ *  Jika QQQ > +qqqThreshold dan r ≥ corrThreshold:
+ *    DIVERGENT   : z ≤ −zDiv
+ *    BUY_LAGGING : −zDiv < z ≤ −zLag
+ *    MOMENTUM    : z > −zLag
+ *  AVOID   : QQQ < −qqqThreshold dan r ≥ corrThreshold
+ *  NEUTRAL : selain itu (termasuk jika z belum tersedia)
  * ===================================================================== */
 function classifySignal(stock, bench, cfg) {
+  if (!isNum(stock.lag_z)) return 'NEUTRAL';
   const q = bench.return_15m;
   const r = stock.correlation;
-  if (q > cfg.qqqThreshold && r >= cfg.corrThreshold) return stock.return_15m < cfg.lagThreshold ? 'BUY_LAGGING' : 'MOMENTUM';
+  const z = stock.lag_z;
+  if (q > cfg.qqqThreshold && r >= cfg.corrThreshold) {
+    if (z <= -effZDiv(cfg)) return 'DIVERGENT';
+    if (z <= -cfg.zLag) return 'BUY_LAGGING';
+    return 'MOMENTUM';
+  }
   if (q < -cfg.qqqThreshold && r >= cfg.corrThreshold) return 'AVOID';
   return 'NEUTRAL';
 }
@@ -375,16 +459,24 @@ function classifySignal(stock, bench, cfg) {
 function explainSignal(stock, bench, cfg, signal) {
   const q = bench.return_15m;
   const r = stock.correlation;
+  const t = stock.ticker;
+  const z = stock.lag_z;
+  const zs = isNum(z) ? z.toFixed(2) : '-';
+  const beta = fmtNum(stock.beta);
   switch (signal) {
     case 'BUY_LAGGING':
-      return `QQQ naik ${fmtPct(q)} (> ${fmtPct(cfg.qqqThreshold)}) dan ${stock.ticker} berkorelasi kuat (r = ${r.toFixed(2)} ≥ ${cfg.corrThreshold.toFixed(2)}), `
-           + `tetapi return 15m saham baru ${fmtPct(stock.return_15m)} (< ${fmtPct(cfg.lagThreshold)}). Berpotensi menyusul (catch-up).`;
+      return `QQQ naik ${fmtPct(q)} dan ${t} berkorelasi kuat (r = ${r.toFixed(2)}). Dengan β ${beta}, ${t} "seharusnya" bergerak ${fmtPct(stock.expected_return)}, `
+           + `tetapi baru ${fmtPct(stock.return_15m)}: tertinggal ${fmtPct(stock.lag_gap)} atau z = ${zs} (BUY jika −${effZDiv(cfg).toFixed(2)} < z ≤ −${cfg.zLag.toFixed(2)}). Berpotensi menyusul (catch-up).`;
     case 'MOMENTUM':
-      return `QQQ naik ${fmtPct(q)} dan ${stock.ticker} sudah bergerak searah (${fmtPct(stock.return_15m)} ≥ ${fmtPct(cfg.lagThreshold)}) dengan korelasi r = ${r.toFixed(2)}. Peluang menyusul sudah berkurang.`;
+      return `QQQ naik ${fmtPct(q)} dan ${t} sudah bergerak sesuai ekspektasi β ${beta} (${fmtPct(stock.return_15m)} vs ${fmtPct(stock.expected_return)}, z = ${zs}). Peluang menyusul kecil.`;
+    case 'DIVERGENT':
+      return `QQQ naik ${fmtPct(q)} tetapi ${t} tertinggal sangat jauh dari ekspektasi β ${beta} (${fmtPct(stock.return_15m)} vs ${fmtPct(stock.expected_return)}, z = ${zs} ≤ −${effZDiv(cfg).toFixed(2)}) walau r = ${r.toFixed(2)}. `
+           + `Divergensi sebesar ini biasanya karena faktor khusus perusahaan (berita, rating, dsb.), bukan sekadar tertinggal. Cek berita sebelum mengambil posisi.`;
     case 'AVOID':
-      return `QQQ turun ${fmtPct(q)} (< -${cfg.qqqThreshold.toFixed(2)}%) dan ${stock.ticker} berkorelasi kuat (r = ${r.toFixed(2)}). Risiko ikut tertekan; hindari entri long.`;
+      return `QQQ turun ${fmtPct(q)} (< -${cfg.qqqThreshold.toFixed(2)}%) dan ${t} berkorelasi kuat (r = ${r.toFixed(2)}, β ${beta}). Risiko ikut tertekan; hindari entri long.`;
     default: {
       const reasons = [];
+      if (!isNum(z)) reasons.push('data beta/lag z belum tersedia dari server');
       if (Math.abs(q) <= cfg.qqqThreshold) reasons.push(`QQQ belum bergerak signifikan (${fmtPct(q)}, ambang ±${cfg.qqqThreshold.toFixed(2)}%)`);
       if (r < cfg.corrThreshold) reasons.push(`korelasi ${r.toFixed(2)} di bawah ambang ${cfg.corrThreshold.toFixed(2)}`);
       if (!reasons.length) reasons.push('QQQ bergerak signifikan tetapi arahnya tidak memenuhi aturan');
@@ -397,27 +489,21 @@ function computeSignals() {
   if (!state.data) return [];
   return state.data.stocks
     .map((s) => Object.assign({}, s, { signal: classifySignal(s, state.data.benchmark, state.cfg) }))
-    .sort((a, b) => (SIGNALS[a.signal].order - SIGNALS[b.signal].order) || (b.correlation - a.correlation));
+    .sort((a, b) => (SIGNALS[a.signal].order - SIGNALS[b.signal].order) || ((a.lag_z ?? 0) - (b.lag_z ?? 0)));
 }
 
 /* =====================================================================
  *  DATA: LIVE (SUPABASE EDGE FUNCTION, mode baca snapshot)
- *  {
- *    "timestamp": "2026-10-28T15:30:00Z",     // waktu bar terakhir
- *    "generated_at": "2026-10-28T15:31:04Z",  // waktu snapshot dihitung
- *    "market_open": true, "fresh": true,
- *    "benchmark": { "ticker": "QQQ", "return_15m": 0.31, "price": 512.3, "volume": 1200000 },
- *    "stocks": [ { "ticker": "NVDA", "correlation": 0.88, "corr_samples": 48, "return_15m": 0.04,
- *                  "price": 145.2, "volume": 3200000, "atr": 0.45, "stop_loss": 143.9, "take_profit": 147.4 } ],
- *    "skipped": [ { "ticker": "SMCI", "reason": "..." } ],
- *    "config": { "qqq_min_return": 0.2, "corr_min": 0.75, "lag_max_return": 0.1, "sl_pct": 0.9, "tp_pct": 1.5 }
- *  }
+ *  stocks[i]: ticker, correlation, corr_samples, beta, return_15m, expected_return, lag_gap, lag_z,
+ *             resid_sigma_15m, price, volume, atr, stop_loss, take_profit, sl_method
+ *  config   : qqq_min_return, corr_min, z_lag, z_divergent, sl_atr, tp_atr, sl_pct, tp_pct, hold_max_min
  * ===================================================================== */
 function normalizePayload(p) {
   if (!p || typeof p !== 'object') throw new Error('Respons bukan objek JSON');
   const b = p.benchmark;
   if (!b || !isNum(toNum(b.return_15m))) throw new Error('Field benchmark.return_15m tidak valid');
-  if (!Array.isArray(p.stocks) || p.stocks.length === 0) throw new Error('Field stocks kosong atau tidak valid');
+  // stocks boleh kosong (mis. semua saham dilewati karena data belum cukup); itu tetap data live yang sah
+  if (!Array.isArray(p.stocks)) throw new Error('Field stocks tidak valid');
 
   const stocks = p.stocks.map((s, i) => {
     if (!s || typeof s.ticker !== 'string') throw new Error('stocks[' + i + '].ticker tidak valid');
@@ -428,12 +514,18 @@ function normalizePayload(p) {
       ticker: s.ticker.toUpperCase().slice(0, 10),
       correlation: clamp(corr, -1, 1),
       corr_samples: optNum(s.corr_samples),
+      beta: optNum(s.beta),
       return_15m: ret,
+      expected_return: optNum(s.expected_return),
+      lag_gap: optNum(s.lag_gap),
+      lag_z: optNum(s.lag_z),
+      resid_sigma_15m: optNum(s.resid_sigma_15m),
       price: optNum(s.price),
       volume: optNum(s.volume),
       atr: optNum(s.atr),
       stop_loss: optNum(s.stop_loss),
-      take_profit: optNum(s.take_profit)
+      take_profit: optNum(s.take_profit),
+      sl_method: s.sl_method === 'ATR' || s.sl_method === 'PCT' ? s.sl_method : null
     };
   });
 
@@ -456,7 +548,10 @@ function normalizePayload(p) {
     },
     stocks,
     skipped: Array.isArray(p.skipped) ? p.skipped.filter((x) => x && typeof x.ticker === 'string').map((x) => ({ ticker: x.ticker, reason: String(x.reason || '') })) : [],
-    config: c ? { qqq: optNum(c.qqq_min_return), corr: optNum(c.corr_min), lag: optNum(c.lag_max_return), sl: optNum(c.sl_pct), tp: optNum(c.tp_pct) } : null
+    config: c ? {
+      qqq: optNum(c.qqq_min_return), corr: optNum(c.corr_min), zLag: optNum(c.z_lag), zDiv: optNum(c.z_divergent),
+      slAtr: optNum(c.sl_atr), tpAtr: optNum(c.tp_atr), sl: optNum(c.sl_pct), tp: optNum(c.tp_pct), holdMax: optNum(c.hold_max_min)
+    } : null
   };
 }
 
@@ -466,16 +561,38 @@ async function fetchLiveDataFromSupabase() {
 }
 
 /* =====================================================================
- *  DATA: SIMULASI (FALLBACK)
+ *  DATA: SIMULASI (hanya jika URL Supabase belum diisi)
  * ===================================================================== */
+function mockLevels(price, atr) {
+  let sl = 1.5 * atr;
+  sl = clamp(sl, price * 0.0025, price * 0.02);
+  const tp = sl * (2.5 / 1.5);
+  return { stop_loss: rnd(price - sl, 2), take_profit: rnd(price + tp, 2), sl_method: 'ATR' };
+}
+
+function mockStock(b, qqq, z) {
+  const corr = clamp(b.corr + rand(-0.06, 0.06), -1, 1);
+  const beta = b.beta * rand(0.9, 1.1);
+  const sigma = b.sig * rand(0.85, 1.15);
+  const expected = beta * qqq;
+  const ret = expected + z * sigma;
+  const price = b.price * (1 + rand(-0.01, 0.01));
+  const atr = price * rand(0.002, 0.005);
+  return Object.assign({
+    ticker: b.ticker, correlation: rnd(corr, 2), corr_samples: 48, beta: rnd(beta, 3),
+    return_15m: rnd(ret, 4), expected_return: rnd(expected, 4), lag_gap: rnd(ret - expected, 4), lag_z: rnd(z, 2),
+    resid_sigma_15m: rnd(sigma, 4), price: rnd(price, 2), volume: Math.round(rand(0.8e6, 9e6)), atr: rnd(atr, 4)
+  }, mockLevels(price, atr));
+}
+
 function fallbackMockData() {
   const base = [
-    { ticker: 'NVDA', corr: 0.88, price: 145.20 },
-    { ticker: 'AMD',  corr: 0.82, price: 162.45 },
-    { ticker: 'TSM',  corr: 0.79, price: 188.30 },
-    { ticker: 'SMCI', corr: 0.66, price: 41.75 },
-    { ticker: 'AAPL', corr: 0.84, price: 228.10 },
-    { ticker: 'MSFT', corr: 0.91, price: 421.60 }
+    { ticker: 'NVDA', corr: 0.88, beta: 1.8, sig: 0.28, price: 145.20 },
+    { ticker: 'AMD',  corr: 0.82, beta: 1.9, sig: 0.35, price: 162.45 },
+    { ticker: 'TSM',  corr: 0.79, beta: 1.5, sig: 0.30, price: 188.30 },
+    { ticker: 'SMCI', corr: 0.66, beta: 2.2, sig: 0.60, price: 41.75 },
+    { ticker: 'META', corr: 0.84, beta: 1.3, sig: 0.25, price: 585.10 },
+    { ticker: 'MSFT', corr: 0.91, beta: 0.9, sig: 0.15, price: 421.60 }
   ];
 
   const dice = Math.random();
@@ -484,30 +601,14 @@ function fallbackMockData() {
   else if (dice < 0.85) qqq = rand(-0.12, 0.15);
   else qqq = -rand(0.25, 0.55);
 
-  const stocks = base.map((b) => {
-    const corr = clamp(b.corr + rand(-0.06, 0.06), -1, 1);
-    const lagging = Math.random() < 0.4;
-    const ret = lagging ? rand(-0.15, 0.08) : qqq * rand(0.6, 1.6) + rand(-0.05, 0.1);
-    const price = b.price * (1 + rand(-0.01, 0.01));
-    return {
-      ticker: b.ticker,
-      correlation: Number(corr.toFixed(2)),
-      corr_samples: 48,
-      return_15m: Number(ret.toFixed(2)),
-      price: Number(price.toFixed(2)),
-      volume: Math.round(rand(0.8e6, 9e6)),
-      atr: Number((price * rand(0.002, 0.006)).toFixed(2)),
-      stop_loss: Number((price * (1 - DEFAULT_SL_PCT / 100)).toFixed(2)),
-      take_profit: Number((price * (1 + DEFAULT_TP_PCT / 100)).toFixed(2))
-    };
-  });
+  const stocks = base.map((b) => mockStock(b, qqq, Math.random() < 0.35 ? rand(-2.4, -1.0) : rand(-0.9, 1.5)));
 
   // Pastikan ada contoh BUY LAGGING saat QQQ naik, agar UI mudah diuji
-  if (qqq > state.cfg.qqqThreshold && !stocks.some((s) => s.correlation >= state.cfg.corrThreshold && s.return_15m < state.cfg.lagThreshold)) {
-    stocks[0].correlation = 0.88;
-    stocks[0].return_15m = Number(rand(-0.05, 0.06).toFixed(2));
+  const cfg = state.cfg;
+  if (qqq > cfg.qqqThreshold && !stocks.some((s) => s.correlation >= cfg.corrThreshold && s.lag_z <= -cfg.zLag && s.lag_z > -effZDiv(cfg))) {
+    stocks[0] = mockStock(Object.assign({}, base[0], { corr: 0.9 }), qqq, -(cfg.zLag + 0.4));
   }
-  if (Math.random() < 0.3) stocks[3].correlation = Number(rand(-0.4, 0.2).toFixed(2));
+  if (Math.random() < 0.3) stocks[3].correlation = rnd(rand(-0.4, 0.2), 2);
 
   const now = new Date().toISOString();
   return normalizePayload({
@@ -515,17 +616,19 @@ function fallbackMockData() {
     generated_at: now,
     market_open: getMarketStatus().open,
     fresh: true,
-    benchmark: { ticker: BENCHMARK, return_15m: Number(qqq.toFixed(2)), price: Number((512 * (1 + rand(-0.005, 0.005))).toFixed(2)), volume: Math.round(rand(2e6, 6e6)) },
+    benchmark: { ticker: BENCHMARK, return_15m: rnd(qqq, 2), price: rnd(512 * (1 + rand(-0.005, 0.005)), 2), volume: Math.round(rand(2e6, 6e6)) },
     stocks,
-    skipped: [{ ticker: 'AMZN', reason: 'contoh simulasi: sampel korelasi < 20' }]
+    skipped: [{ ticker: 'AMZN', reason: 'contoh simulasi: sampel korelasi < 20' }],
+    config: { qqq_min_return: 0.2, corr_min: 0.75, z_lag: 1, z_divergent: 3, sl_atr: 1.5, tp_atr: 2.5, sl_pct: 0.9, tp_pct: 1.5, hold_max_min: 60 }
   });
 }
 
 /* =====================================================================
- *  RIWAYAT SINYAL (PostgREST: tabel signal_logs)
+ *  RIWAYAT & KINERJA SINYAL (PostgREST: tabel signal_logs)
  * ===================================================================== */
 function normalizeLog(r) {
   const status = String(r.ai_status || 'PASSED').toUpperCase();
+  const oc = r.outcome ? String(r.outcome).toUpperCase() : null;
   return {
     id: r.id,
     created_at: new Date(r.created_at),
@@ -533,11 +636,19 @@ function normalizeLog(r) {
     qqq_return: optNum(r.qqq_return),
     stock_return: optNum(r.stock_return),
     correlation: optNum(r.correlation),
+    lag_z: optNum(r.lag_z),
     entry_price: optNum(r.entry_price),
     stop_loss: optNum(r.stop_loss),
     take_profit: optNum(r.take_profit),
     ai_status: GUARD[status] ? status : 'BYPASSED',
-    ai_reason: String(r.ai_reason || '')
+    ai_reason: String(r.ai_reason || ''),
+    blocked: r.blocked === true,
+    alert_sent: r.alert_sent === true,
+    outcome: OUTCOME[oc] ? oc : null,
+    return_pct: optNum(r.return_pct),
+    mfe_pct: optNum(r.mfe_pct),
+    mae_pct: optNum(r.mae_pct),
+    bars_held: optNum(r.bars_held)
   };
 }
 
@@ -550,21 +661,128 @@ async function fetchSignalHistory() {
   return { rows: json.map(normalizeLog), total: m ? parseInt(m[1], 10) : json.length };
 }
 
+async function fetchPerformance() {
+  const cols = 'ticker,ai_status,blocked,alert_sent,outcome,return_pct,mfe_pct,mae_pct,bars_held,created_at';
+  const url = SUPABASE_URL + '/rest/v1/signal_logs?select=' + cols + '&outcome=in.(TP,SL,TIMEOUT)&order=created_at.desc&limit=' + PERF_LIMIT;
+  const { json } = await fetchJsonTimeout(url, { method: 'GET', headers: authHeaders() });
+  if (!Array.isArray(json)) throw new Error('Respons kinerja bukan array');
+  return json.map(normalizeLog).filter((r) => isNum(r.return_pct));
+}
+
 function mockHistory() {
   const now = Date.now();
-  const mk = (minAgo, tk, q, s, r, entry, st, why) => normalizeLog({
-    id: tk + minAgo, created_at: new Date(now - minAgo * 60000).toISOString(), ticker: tk, qqq_return: q, stock_return: s, correlation: r,
-    entry_price: entry, stop_loss: Number((entry * 0.991).toFixed(2)), take_profit: Number((entry * 1.015).toFixed(2)), ai_status: st, ai_reason: why
+  const mk = (minAgo, tk, q, s, z, entry, st, why, oc, ret) => normalizeLog({
+    id: tk + minAgo, created_at: new Date(now - minAgo * 60000).toISOString(), ticker: tk, qqq_return: q, stock_return: s, lag_z: z,
+    entry_price: entry, stop_loss: rnd(entry * 0.9955, 2), take_profit: rnd(entry * 1.0075, 2), ai_status: st, ai_reason: why,
+    blocked: st === 'REJECTED', alert_sent: st !== 'REJECTED', outcome: oc, return_pct: ret,
+    mfe_pct: oc === 'OPEN' ? 0.21 : Math.max(ret, 0) + 0.1, mae_pct: oc === 'OPEN' ? -0.12 : Math.min(ret, 0) - 0.1, bars_held: 5
   });
   return {
     rows: [
-      mk(12, 'NVDA', 0.31, -0.04, 0.88, 145.2, 'PASSED', 'Tidak ada berita buruk'),
-      mk(47, 'AAPL', 0.28, 0.06, 0.84, 228.1, 'REJECTED', 'Investigasi regulator terhadap penjualan'),
-      mk(95, 'AMD', 0.35, 0.02, 0.8, 162.45, 'NO_NEWS', 'Tidak ada berita 24 jam terakhir'),
-      mk(140, 'TSM', 0.26, 0.0, 0.79, 188.3, 'BYPASSED', 'Guardrail gagal: timeout')
+      mk(12, 'NVDA', 0.31, 0.10, -1.6, 145.2, 'PASSED', 'Tidak ada berita buruk', 'OPEN', null),
+      mk(47, 'META', 0.28, 0.06, -1.3, 585.1, 'REJECTED', 'Investigasi regulator terhadap penjualan', 'SL', -0.45),
+      mk(95, 'AMD', 0.35, 0.02, -2.1, 162.45, 'NO_NEWS', 'Tidak ada berita 24 jam terakhir', 'TP', 0.75),
+      mk(140, 'TSM', 0.26, 0.0, -1.2, 188.3, 'BYPASSED', 'Guardrail gagal: timeout', 'TIMEOUT', 0.18)
     ],
     total: 4
   };
+}
+
+function mockPerformance() {
+  const tickers = ['NVDA', 'AMD', 'TSM', 'META', 'MSFT', 'SMCI'];
+  const statuses = ['PASSED', 'PASSED', 'PASSED', 'NO_NEWS', 'BYPASSED', 'REJECTED'];
+  const rows = [];
+  for (let i = 0; i < 24; i++) {
+    const st = statuses[Math.floor(Math.random() * statuses.length)];
+    const d = Math.random();
+    const oc = d < 0.42 ? 'TP' : (d < 0.78 ? 'SL' : 'TIMEOUT');
+    const ret = oc === 'TP' ? rand(0.5, 1.0) : (oc === 'SL' ? -rand(0.3, 0.6) : rand(-0.3, 0.4));
+    rows.push(normalizeLog({
+      ticker: tickers[i % tickers.length], ai_status: st, blocked: st === 'REJECTED', alert_sent: st !== 'REJECTED',
+      outcome: oc, return_pct: rnd(ret, 3), mfe_pct: rnd(Math.max(ret, 0) + rand(0, 0.3), 3), mae_pct: rnd(Math.min(ret, 0) - rand(0, 0.3), 3),
+      bars_held: Math.round(rand(1, 12)), created_at: new Date(Date.now() - i * 3600000).toISOString()
+    }));
+  }
+  return rows;
+}
+
+/* =====================================================================
+ *  STATISTIK KINERJA
+ * ===================================================================== */
+function aggregate(rows) {
+  const n = rows.length;
+  if (!n) return null;
+  let wins = 0, sum = 0, gp = 0, gl = 0, tp = 0, sl = 0, to = 0;
+  let mfe = 0, mfeN = 0, mae = 0, maeN = 0, bars = 0, barsN = 0;
+  rows.forEach((r) => {
+    const x = r.return_pct;
+    sum += x;
+    if (x > 0) { wins++; gp += x; } else { gl += -x; }
+    if (r.outcome === 'TP') tp++; else if (r.outcome === 'SL') sl++; else if (r.outcome === 'TIMEOUT') to++;
+    if (isNum(r.mfe_pct)) { mfe += r.mfe_pct; mfeN++; }
+    if (isNum(r.mae_pct)) { mae += r.mae_pct; maeN++; }
+    if (isNum(r.bars_held)) { bars += r.bars_held; barsN++; }
+  });
+  return {
+    n, win: wins / n * 100, avg: sum / n, total: sum,
+    pf: gl > 0 ? gp / gl : (gp > 0 ? Infinity : null),
+    tp, sl, to,
+    mfe: mfeN ? mfe / mfeN : null, mae: maeN ? mae / maeN : null,
+    mins: barsN ? bars / barsN * 5 : null
+  };
+}
+
+function perfRow(label, a, extraCls = '') {
+  if (!a) return '<tr class="' + extraCls + '"><td>' + label + '</td><td class="text-end text-muted-dss">0</td><td colspan="4" class="text-muted-dss">-</td></tr>';
+  return '<tr class="' + extraCls + '"><td>' + label + '</td>' +
+    '<td class="text-end">' + a.n + '</td>' +
+    '<td class="text-end">' + a.win.toFixed(0) + '%</td>' +
+    '<td class="text-end ' + pctClass(a.avg) + '">' + fmtPct(a.avg) + '</td>' +
+    '<td class="text-end ' + pctClass(a.total) + '">' + fmtPct(a.total, 1) + '</td>' +
+    '<td class="text-end text-muted-dss">' + a.tp + '/' + a.sl + '/' + a.to + '</td></tr>';
+}
+
+function renderPerformance() {
+  const p = state.perf;
+  $('perfMode').textContent = p.mode === 'simulation' ? '(simulasi: Supabase belum dikonfigurasi)' : '';
+  if (p.error) {
+    $('perfWarn').innerHTML = '<div class="alert alert-danger py-2 small mb-2">Gagal membaca data kinerja: ' + escapeHtml(p.error) +
+      '. Jika kolom outcome belum ada, jalankan migration_v3.sql.</div>';
+    $('perfKpi').innerHTML = ''; $('perfGroups').innerHTML = ''; $('perfTickers').innerHTML = '';
+    return;
+  }
+  const all = aggregate(p.rows);
+  if (!all) {
+    $('perfWarn').innerHTML = '<div class="text-muted-dss small mb-2">Belum ada sinyal yang tertutup. Statistik muncul setelah sinyal pertama kena TP, SL, atau batas waktu.</div>';
+    $('perfKpi').innerHTML = ''; $('perfGroups').innerHTML = ''; $('perfTickers').innerHTML = '';
+    return;
+  }
+  $('perfWarn').innerHTML = all.n < PERF_MIN_SAMPLE
+    ? '<div class="alert alert-secondary py-2 small mb-2">Baru ' + all.n + ' sinyal tertutup. Butuh setidaknya ±' + PERF_MIN_SAMPLE + ' sebelum angka ini cukup bermakna untuk mengubah threshold.</div>'
+    : '';
+
+  const kpi = (label, value, cls = '', sub = '') =>
+    '<div class="col-6 col-md-4 col-xl-2"><div class="kpi"><div class="small-label">' + label + '</div><div class="v ' + cls + '">' + value + '</div>' +
+    (sub ? '<div class="tiny text-muted-dss">' + sub + '</div>' : '') + '</div></div>';
+  const pfTxt = all.pf === null ? '-' : (all.pf === Infinity ? '∞' : all.pf.toFixed(2));
+  $('perfKpi').innerHTML =
+    kpi('Sinyal tertutup', all.n, '', 'TP ' + all.tp + ' · SL ' + all.sl + ' · TO ' + all.to) +
+    kpi('Win rate', all.win.toFixed(0) + '%', '', 'return &gt; 0') +
+    kpi('Rata² / sinyal', fmtPct(all.avg), pctClass(all.avg), 'total ' + fmtPct(all.total, 1)) +
+    kpi('Profit factor', pfTxt, all.pf !== null && all.pf >= 1 ? 'pos' : 'neg', 'untung ÷ rugi') +
+    kpi('Rata² MFE / MAE', fmtPct(all.mfe, 2), 'pos', 'MAE ' + fmtPct(all.mae, 2)) +
+    kpi('Rata² durasi', isNum(all.mins) ? Math.round(all.mins) + ' mnt' : '-', '', 'sejak bar entry');
+
+  const by = (pred) => aggregate(p.rows.filter(pred));
+  $('perfGroups').innerHTML =
+    perfRow('<strong>Semua</strong>', all) +
+    perfRow('Alert terkirim', by((r) => r.alert_sent)) +
+    perfRow('Diblokir guardrail', by((r) => r.blocked)) +
+    Object.keys(GUARD).map((k) => perfRow('<span class="badge ' + GUARD[k].cls + '">' + GUARD[k].label + '</span>', by((r) => r.ai_status === k))).join('');
+
+  const tickers = Array.from(new Set(p.rows.map((r) => r.ticker)));
+  const tickerAgg = tickers.map((t) => ({ t, a: by((r) => r.ticker === t) })).sort((x, y) => y.a.n - x.a.n || y.a.avg - x.a.avg);
+  $('perfTickers').innerHTML = tickerAgg.map((x) => perfRow('<span class="ticker-cell">' + escapeHtml(x.t) + '</span>', x.a)).join('');
 }
 
 /* =====================================================================
@@ -587,21 +805,33 @@ function setLoading(on) {
   $('btnLabel').textContent = on ? 'Memuat...' : 'Refresh Data';
 }
 
+// Data simulasi HANYA dipakai saat URL Supabase belum diisi (mode uji UI).
+// Jika URL sudah diisi lalu refresh gagal, dashboard tetap menampilkan snapshot live terakhir
+// dengan tanda GAGAL REFRESH, atau tidak menampilkan apa pun jika belum pernah berhasil.
+// Sinyal acak tidak pernah dicampur dengan mode live supaya tidak disangka sinyal sungguhan.
 async function refreshSnapshot() {
   if (!isUrlConfigured()) {
     state.data = fallbackMockData();
     state.mode = 'simulation';
-    showAlert('URL Supabase belum diisi. Menampilkan data simulasi agar UI dapat diuji.', 'info');
+    state.liveError = null;
+    showAlert('URL Supabase belum diisi. Menampilkan data SIMULASI agar UI dapat diuji.', 'info');
     return;
   }
   try {
     state.data = await fetchLiveDataFromSupabase();
     state.mode = 'live';
+    state.liveError = null;
     clearAlert();
   } catch (e) {
-    state.data = fallbackMockData();
-    state.mode = 'simulation';
-    showAlert('Gagal mengambil data live (' + e.message + '). Menampilkan data simulasi.', 'warning');
+    state.liveError = e.message;
+    if (state.mode === 'live' && state.data) {
+      showAlert('Gagal refresh data live (' + e.message + '). Yang tampil adalah snapshot terakhir dari ' +
+        fmtWibTime(new Date(state.data.generated_at)) + ' WIB, jangan dipakai sebagai sinyal terkini.', 'danger');
+    } else {
+      state.data = null;
+      state.mode = 'none';
+      showAlert('Gagal mengambil data live (' + e.message + '). Belum ada data yang bisa ditampilkan.', 'danger');
+    }
   }
 }
 
@@ -609,14 +839,16 @@ async function refreshHistory() {
   if (!isDbConfigured()) {
     const m = mockHistory();
     state.history = { rows: m.rows, total: m.total, mode: 'simulation', error: null };
+    state.perf = { rows: mockPerformance(), mode: 'simulation', error: null };
     return;
   }
-  try {
-    const h = await fetchSignalHistory();
-    state.history = { rows: h.rows, total: h.total, mode: 'live', error: null };
-  } catch (e) {
-    state.history = { rows: [], total: null, mode: 'live', error: e.message };
-  }
+  const [h, p] = await Promise.allSettled([fetchSignalHistory(), fetchPerformance()]);
+  state.history = h.status === 'fulfilled'
+    ? { rows: h.value.rows, total: h.value.total, mode: 'live', error: null }
+    : { rows: [], total: null, mode: 'live', error: h.reason.message };
+  state.perf = p.status === 'fulfilled'
+    ? { rows: p.value, mode: 'live', error: null }
+    : { rows: [], mode: 'live', error: p.reason.message };
 }
 
 async function refreshData() {
@@ -644,8 +876,13 @@ function updateStatusBar() {
   const sb = $('statusBadge');
   const lu = $('lastUpdated');
   if (!state.data) {
-    sb.className = 'badge text-bg-secondary';
-    sb.textContent = 'Memuat...';
+    if (state.mode === 'none') {
+      sb.className = 'badge text-bg-danger';
+      sb.textContent = 'Tidak Ada Data';
+    } else {
+      sb.className = 'badge text-bg-secondary';
+      sb.textContent = 'Memuat...';
+    }
     lu.textContent = 'Last updated: -';
     return;
   }
@@ -657,8 +894,9 @@ function updateStatusBar() {
 
   if (state.mode === 'live') {
     const stale = market.open && (ageMs > STALE_AFTER_MS || state.data.fresh === false);
-    sb.className = 'badge ' + (stale ? 'text-bg-danger' : 'text-bg-success') + (stale ? '' : ' pulse');
-    sb.textContent = stale ? 'Live Data (STALE)' : 'Live Data';
+    const bad = stale || !!state.liveError;
+    sb.className = 'badge ' + (bad ? 'text-bg-danger' : 'text-bg-success') + (bad ? '' : ' pulse');
+    sb.textContent = state.liveError ? 'Live Data (GAGAL REFRESH)' : (stale ? 'Live Data (STALE)' : 'Live Data');
   } else {
     sb.className = 'badge text-bg-warning';
     sb.textContent = 'Simulation';
@@ -713,7 +951,9 @@ function renderGraph(rows) {
     nodes.push({
       id: s.ticker,
       label: s.ticker + '\n' + fmtPct(s.return_15m),
-      title: s.ticker + '\nKorelasi: ' + s.correlation.toFixed(2) + '\nReturn 15m: ' + fmtPct(s.return_15m) + '\nSinyal: ' + meta.label,
+      title: s.ticker + '\nKorelasi: ' + s.correlation.toFixed(2) + '  β: ' + fmtNum(s.beta) +
+        '\nReturn 15m: ' + fmtPct(s.return_15m) + ' (ekspektasi ' + fmtPct(s.expected_return) + ')' +
+        '\nLag z: ' + fmtSigned(s.lag_z) + '\nSinyal: ' + meta.label,
       x: Math.cos(angle) * radius,
       y: Math.sin(angle) * radius,
       fixed: true,
@@ -735,7 +975,7 @@ function renderGraph(rows) {
       width: 1 + absR * 9,
       dashes: s.correlation < 0,
       label: 'r=' + s.correlation.toFixed(2),
-      title: BENCHMARK + ' ↔ ' + s.ticker + '\nr = ' + s.correlation.toFixed(3),
+      title: BENCHMARK + ' ↔ ' + s.ticker + '\nr = ' + s.correlation.toFixed(3) + '\nβ = ' + fmtNum(s.beta, 3),
       color: { color: meta.color, highlight: meta.color, hover: meta.color, opacity: s.signal === 'NEUTRAL' ? 0.55 : 0.95 }
     });
   });
@@ -762,7 +1002,7 @@ function levelsOf(s) {
 }
 
 function renderTable(rows) {
-  const counts = { BUY_LAGGING: 0, MOMENTUM: 0, AVOID: 0, NEUTRAL: 0 };
+  const counts = { BUY_LAGGING: 0, MOMENTUM: 0, DIVERGENT: 0, AVOID: 0, NEUTRAL: 0 };
   $('signalBody').innerHTML = rows.map((s) => {
     counts[s.signal]++;
     const meta = SIGNALS[s.signal];
@@ -775,15 +1015,19 @@ function renderTable(rows) {
       '<td class="ticker-cell">' + escapeHtml(s.ticker) + '</td>' +
       '<td class="text-end">' + fmtPrice(s.price) + '</td>' +
       '<td class="text-end">' + s.correlation.toFixed(2) + '</td>' +
+      '<td class="text-end">' + fmtNum(s.beta) + '</td>' +
       '<td class="text-end ' + pctClass(s.return_15m) + '">' + fmtPct(s.return_15m) + '</td>' +
+      '<td class="text-end text-muted-dss">' + fmtPct(s.expected_return) + '</td>' +
+      '<td class="text-end ' + zClass(s.lag_z, state.cfg) + '">' + fmtSigned(s.lag_z) + '</td>' +
       '<td class="text-end text-muted-dss">' + fmtVolume(s.volume) + '</td>' +
       '<td><span class="badge badge-signal ' + meta.badge + '">' + meta.label + '</span></td>' +
       '<td class="text-end">' + sltp + '</td></tr>';
-  }).join('');
+  }).join('') || '<tr><td colspan="10" class="text-center text-muted-dss py-4">Tidak ada saham yang lolos perhitungan pada snapshot ini (lihat catatan "Dilewati" di bawah).</td></tr>';
 
   $('signalSummary').innerHTML =
     '<span class="badge badge-buy me-1">BUY ' + counts.BUY_LAGGING + '</span>' +
     '<span class="badge badge-momentum me-1">MOM ' + counts.MOMENTUM + '</span>' +
+    '<span class="badge badge-divergent me-1">DIV ' + counts.DIVERGENT + '</span>' +
     '<span class="badge badge-avoid me-1">AVOID ' + counts.AVOID + '</span>' +
     '<span class="badge badge-neutral">NEU ' + counts.NEUTRAL + '</span>';
 
@@ -793,8 +1037,10 @@ function renderTable(rows) {
     : '';
 
   const c = state.data.config;
+  const v = (x) => (x === null || x === undefined ? '-' : x);
   $('serverCfg').textContent = c
-    ? 'Threshold server: QQQ > +' + (c.qqq ?? '-') + '% · r ≥ ' + (c.corr ?? '-') + ' · saham < +' + (c.lag ?? '-') + '% · SL -' + (c.sl ?? '-') + '% / TP +' + (c.tp ?? '-') + '%'
+    ? 'Threshold server: QQQ > +' + v(c.qqq) + '% · r ≥ ' + v(c.corr) + ' · BUY jika −' + v(c.zDiv) + ' < z ≤ −' + v(c.zLag) +
+      ' · SL ' + v(c.slAtr) + '×ATR / TP ' + v(c.tpAtr) + '×ATR · batas waktu ' + v(c.holdMax) + ' mnt'
     : '';
 }
 
@@ -810,28 +1056,32 @@ function renderDetail(rows) {
   }
   const meta = SIGNALS[s.signal];
   const bench = state.data.benchmark;
-  const gap = s.return_15m - bench.return_15m;
   const lv = levelsOf(s);
+  const cell = (label, value, cls = '', col = 'col-6') =>
+    '<div class="' + col + '"><div class="small-label">' + label + '</div><div class="detail-value ' + cls + '">' + value + '</div></div>';
   let levels = '';
   if (lv) {
     const slPct = (lv.sl / s.price - 1) * 100, tpPct = (lv.tp / s.price - 1) * 100;
+    const basis = s.sl_method === 'ATR' ? 'basis ATR' : (s.sl_method === 'PCT' ? 'basis persen' : '');
     levels =
-      '<div class="col-6"><div class="small-label">Stop-loss (' + fmtPct(slPct, 1) + ')</div><div class="detail-value neg">' + lv.sl.toFixed(2) + '</div></div>' +
-      '<div class="col-6"><div class="small-label">Take-profit (' + fmtPct(tpPct, 1) + ')</div><div class="detail-value pos">' + lv.tp.toFixed(2) + '</div></div>' +
-      '<div class="col-6"><div class="small-label">Rasio R:R</div><div class="detail-value">1 : ' + (tpPct / Math.abs(slPct)).toFixed(1) + '</div></div>' +
-      '<div class="col-6"><div class="small-label">ATR (5m, 14 bar)</div><div class="detail-value">' + (isNum(s.atr) ? s.atr.toFixed(2) : '-') + '</div></div>';
+      cell('Stop-loss (' + fmtPct(slPct, 2) + ')', lv.sl.toFixed(2), 'neg') +
+      cell('Take-profit (' + fmtPct(tpPct, 2) + ')', lv.tp.toFixed(2), 'pos') +
+      cell('Rasio R:R', '1 : ' + (tpPct / Math.abs(slPct)).toFixed(1)) +
+      cell('ATR (5m, 14 bar)' + (basis ? ' <span class="tiny">· ' + basis + '</span>' : ''), isNum(s.atr) ? s.atr.toFixed(2) : '-');
   }
   panel.innerHTML =
     '<div class="d-flex justify-content-between align-items-center mb-3">' +
       '<span class="fs-4 fw-bold">' + escapeHtml(s.ticker) + '</span>' +
       '<span class="badge badge-signal ' + meta.badge + '">' + meta.label + '</span></div>' +
     '<div class="row g-3 mb-3">' +
-      '<div class="col-6"><div class="small-label">Harga</div><div class="detail-value">' + fmtPrice(s.price) + '</div></div>' +
-      '<div class="col-6"><div class="small-label">Volume 15m</div><div class="detail-value">' + fmtVolume(s.volume) + '</div></div>' +
-      '<div class="col-6"><div class="small-label">Korelasi ke ' + escapeHtml(bench.ticker) + '</div><div class="detail-value">' + s.correlation.toFixed(3) +
-        (isNum(s.corr_samples) ? ' <span class="tiny text-muted-dss">n=' + s.corr_samples + '</span>' : '') + '</div></div>' +
-      '<div class="col-6"><div class="small-label">Return 15m</div><div class="detail-value ' + pctClass(s.return_15m) + '">' + fmtPct(s.return_15m) + '</div></div>' +
-      '<div class="col-12"><div class="small-label">Selisih vs ' + escapeHtml(bench.ticker) + '</div><div class="detail-value ' + pctClass(gap) + '">' + fmtPct(gap) + '</div></div>' +
+      cell('Harga', fmtPrice(s.price)) +
+      cell('Volume 15m', fmtVolume(s.volume)) +
+      cell('Korelasi ke ' + escapeHtml(bench.ticker), s.correlation.toFixed(3) + (isNum(s.corr_samples) ? ' <span class="tiny text-muted-dss">n=' + s.corr_samples + '</span>' : '')) +
+      cell('Beta (<span class="nc">β</span>)', fmtNum(s.beta, 2)) +
+      cell('Return 15m', fmtPct(s.return_15m), pctClass(s.return_15m)) +
+      cell('Ekspektasi (<span class="nc">β</span> × QQQ)', fmtPct(s.expected_return), pctClass(s.expected_return)) +
+      cell('Selisih vs ekspektasi', fmtPct(s.lag_gap), pctClass(s.lag_gap)) +
+      cell('Lag z <span class="tiny nc">(σ ' + (isNum(s.resid_sigma_15m) ? s.resid_sigma_15m.toFixed(2) + '%' : '-') + ')</span>', fmtSigned(s.lag_z), zClass(s.lag_z, state.cfg)) +
       levels +
     '</div>' +
     '<div class="small text-muted-dss">' + escapeHtml(explainSignal(s, bench, state.cfg, s.signal)) + '</div>' +
@@ -841,6 +1091,16 @@ function renderDetail(rows) {
 /* =====================================================================
  *  RENDER: RIWAYAT SINYAL
  * ===================================================================== */
+function outcomeCell(r) {
+  if (!r.outcome) return '<span class="text-muted-dss">-</span>';
+  const o = OUTCOME[r.outcome];
+  const tip = 'MFE ' + fmtPct(r.mfe_pct) + ' · MAE ' + fmtPct(r.mae_pct) + (isNum(r.bars_held) ? ' · ' + r.bars_held + ' bar' : '');
+  let extra = '';
+  if (isNum(r.return_pct)) extra = ' <span class="' + pctClass(r.return_pct) + '">' + fmtPct(r.return_pct) + '</span>';
+  else if (r.outcome === 'OPEN' && (isNum(r.mfe_pct) || isNum(r.mae_pct))) extra = ' <span class="tiny text-muted-dss">' + escapeHtml(tip) + '</span>';
+  return '<span class="badge ' + o.cls + '" title="' + escapeHtml(tip) + '">' + o.label + '</span>' + extra;
+}
+
 function renderHistory() {
   const h = state.history;
   const tbody = $('historyBody');
@@ -848,7 +1108,7 @@ function renderHistory() {
 
   if (h.error) {
     $('historySummary').innerHTML = '';
-    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger py-4">Gagal membaca riwayat: ' + escapeHtml(h.error) + '</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="text-center text-danger py-4">Gagal membaca riwayat: ' + escapeHtml(h.error) + '</td></tr>';
     return;
   }
 
@@ -859,7 +1119,7 @@ function renderHistory() {
     Object.keys(GUARD).map((k) => '<span class="badge ' + GUARD[k].cls + ' me-1">' + GUARD[k].label + ' ' + cnt[k] + '</span>').join('');
 
   if (!h.rows.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted-dss py-4">Belum ada sinyal tercatat. Jika yakin sudah ada, pastikan policy RLS baca untuk anon sudah dibuat (lihat migration.sql).</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted-dss py-4">Belum ada sinyal tercatat. Jika yakin sudah ada, pastikan policy RLS baca untuk anon sudah dibuat (lihat migration.sql).</td></tr>';
     return;
   }
 
@@ -871,25 +1131,39 @@ function renderHistory() {
       '<td class="ticker-cell">' + escapeHtml(r.ticker) + '</td>' +
       '<td class="text-end ' + pctClass(r.qqq_return) + '">' + fmtPct(r.qqq_return) + '</td>' +
       '<td class="text-end ' + pctClass(r.stock_return) + '">' + fmtPct(r.stock_return) + '</td>' +
-      '<td class="text-end">' + (isNum(r.correlation) ? r.correlation.toFixed(2) : '-') + '</td>' +
+      '<td class="text-end">' + fmtSigned(r.lag_z) + '</td>' +
       '<td class="text-end">' + fmtPrice(r.entry_price) + '</td>' +
       '<td class="text-end neg">' + (isNum(r.stop_loss) ? r.stop_loss.toFixed(2) : '-') + pct(r.stop_loss) + '</td>' +
       '<td class="text-end pos">' + (isNum(r.take_profit) ? r.take_profit.toFixed(2) : '-') + pct(r.take_profit) + '</td>' +
       '<td><span class="badge ' + g.cls + '" title="' + escapeHtml(r.ai_reason) + '">' + g.label + '</span>' +
-        (r.ai_reason ? ' <span class="tiny text-muted-dss d-none d-xl-inline">' + escapeHtml(r.ai_reason.slice(0, 60)) + '</span>' : '') + '</td></tr>';
+        (r.ai_reason ? ' <span class="tiny text-muted-dss d-none d-xl-inline">' + escapeHtml(r.ai_reason.slice(0, 50)) + '</span>' : '') + '</td>' +
+      '<td>' + outcomeCell(r) + '</td></tr>';
   }).join('');
 }
 
 /* =====================================================================
  *  RENDER ALL
  * ===================================================================== */
+function renderNoData() {
+  nodesDS.clear();
+  edgesDS.clear();
+  $('signalBody').innerHTML = '<tr><td colspan="10" class="text-center text-danger py-4">Data live belum tersedia. Coba Refresh Data beberapa saat lagi.</td></tr>';
+  $('signalSummary').innerHTML = '';
+  $('skippedNote').innerHTML = '';
+  $('serverCfg').textContent = '';
+  $('detailPanel').innerHTML = '<p class="text-muted-dss mb-0">Tidak ada data.</p>';
+}
+
 function renderAll() {
   if (state.data) {
     const rows = computeSignals();
     renderGraph(rows);
     renderTable(rows);
     renderDetail(rows);
+  } else if (state.mode === 'none') {
+    renderNoData();
   }
+  renderPerformance();
   renderHistory();
   updateStatusBar();
 }
@@ -905,12 +1179,14 @@ function selectTicker(ticker) {
 function syncCfgLabels() {
   $('lblQqq').textContent = '> +' + state.cfg.qqqThreshold.toFixed(2) + '%';
   $('lblCorr').textContent = '≥ ' + state.cfg.corrThreshold.toFixed(2);
-  $('lblLag').textContent = '< +' + state.cfg.lagThreshold.toFixed(2) + '%';
+  $('lblZLag').textContent = 'z ≤ −' + state.cfg.zLag.toFixed(1);
+  $('lblZDiv').textContent = 'z ≤ −' + effZDiv(state.cfg).toFixed(2);
 }
 function syncCfgInputs() {
   $('rngQqq').value = state.cfg.qqqThreshold;
   $('rngCorr').value = state.cfg.corrThreshold;
-  $('rngLag').value = state.cfg.lagThreshold;
+  $('rngZLag').value = state.cfg.zLag;
+  $('rngZDiv').value = state.cfg.zDiv;
   syncCfgLabels();
 }
 function bindCfgInputs() {
@@ -924,7 +1200,8 @@ function bindCfgInputs() {
   };
   bind('rngQqq', 'qqqThreshold');
   bind('rngCorr', 'corrThreshold');
-  bind('rngLag', 'lagThreshold');
+  bind('rngZLag', 'zLag');
+  bind('rngZDiv', 'zDiv');
   $('btnResetCfg').addEventListener('click', () => {
     state.cfg = Object.assign({}, DEFAULT_CFG);
     saveCfg();
