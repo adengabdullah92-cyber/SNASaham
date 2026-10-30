@@ -1,257 +1,501 @@
 <!DOCTYPE html>
-<html lang="id" data-bs-theme="dark">
+<html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Stock SNA DSS</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
-  <style>
-    :root {
-      --bg: #121212;
-      --card: #1c1c1e;
-      --card-border: #2c2c2e;
-      --muted: #9a9aa0;
-      --green: #28c76f;
-      --yellow: #ffc107;
-      --gray: #6c757d;
-      --red: #ea5455;
-      --blue: #3b82f6;
-      --purple: #a855f7;
-    }
-    html, body { background: var(--bg); color: #e6e6e6; min-height: 100%; }
-    .navbar-dss { background: #181818; border-bottom: 1px solid var(--card-border); }
-    .card-dss { background: var(--card); border: 1px solid var(--card-border); border-radius: 12px; }
-    .card-dss .card-header { background: transparent; border-bottom: 1px solid var(--card-border); font-weight: 600; }
-    #graph { height: 520px; width: 100%; background: #151517; }
-    @media (max-width: 767px) { #graph { height: 420px; } }
-    .legend-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
-    .legend-line { display: inline-block; width: 26px; height: 0; border-top: 3px solid #888; margin-right: 6px; vertical-align: middle; }
-    .legend-line.dashed { border-top-style: dashed; }
-    .table-dss { --bs-table-bg: transparent; --bs-table-hover-bg: #26262a; margin-bottom: 0; }
-    .table-dss th { color: var(--muted); font-weight: 500; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
-    .table-dss td { vertical-align: middle; white-space: nowrap; }
-    .table-dss tbody tr.clickable { cursor: pointer; }
-    .table-dss tbody tr.selected { outline: 1px solid var(--blue); outline-offset: -1px; background: #1f2633; }
-    .row-buy { box-shadow: inset 3px 0 0 var(--yellow); }
-    .ticker-cell { font-weight: 700; letter-spacing: .02em; }
-    .pos { color: var(--green); }
-    .neg { color: var(--red); }
-    .zlag { color: var(--yellow); font-weight: 600; }
-    .zdiv { color: var(--purple); font-weight: 600; }
-    .badge-signal { font-size: .75rem; padding: .4em .7em; letter-spacing: .03em; }
-    .badge-buy { background: var(--yellow); color: #1a1a1a; }
-    .badge-momentum { background: var(--green); color: #07210f; }
-    .badge-neutral { background: var(--gray); color: #fff; }
-    .badge-avoid { background: var(--red); color: #fff; }
-    .badge-divergent { background: var(--purple); color: #fff; }
-    .text-muted-dss { color: var(--muted); }
-    .small-label { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
-    .detail-value { font-size: 1.05rem; font-weight: 600; }
-    .kpi { background: #222225; border: 1px solid var(--card-border); border-radius: 10px; padding: .65rem .8rem; height: 100%; }
-    .kpi .v { font-size: 1.25rem; font-weight: 700; }
-    .form-range::-webkit-slider-runnable-track { background: #2c2c2e; }
-    .pulse { animation: pulse 1.6s infinite; }
-    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: .45; } 100% { opacity: 1; } }
-    .tiny { font-size: .75rem; }
-    .nc { text-transform: none !important; }   /* cegah β/σ berubah jadi huruf kapital di label uppercase */
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stock SNA DSS</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+<style>
+/* Layout: bar komando → [radar korelasi | target lock] → papan sinyal → kinerja → log misi → kalibrasi.
+   Tampilan sengaja satu tema (gelap): HUD hologram cyan dengan aksen emas. */
+:root {
+  color-scheme: dark;
+  --bg: #04080e;
+  --bg-2: #071320;
+  --panel: #07121c;
+  --panel-2: #0b1a27;
+  --line: rgba(63, 224, 255, .32);
+  --line-soft: rgba(63, 224, 255, .12);
+  --cyan: #3fe0ff;
+  --cyan-dim: #1d8fb0;
+  --gold: #e8c170;
+  --gold-dim: #9c7b3a;
+  --text: #d6f4ff;
+  --muted: #6f93a6;
+  --buy: #ffb627;   --buy-a: rgba(255, 182, 39, .14);
+  --mom: #2ee6a0;   --mom-a: rgba(46, 230, 160, .12);
+  --div: #b07cff;   --div-a: rgba(176, 124, 255, .14);
+  --avoid: #ff4d6a; --avoid-a: rgba(255, 77, 106, .13);
+  --neu: #7d909c;   --neu-a: rgba(125, 144, 156, .14);
+  --font-display: 'Chakra Petch', 'Rajdhani', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --chamfer: 14px;
+}
+
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 60; background: var(--bg); }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.nc { text-transform: none !important; }
+.gold { color: var(--gold); }
+.muted { color: var(--muted); }
+.pos { color: var(--mom); }
+.neg { color: var(--avoid); }
+.z-buy { color: var(--buy); font-weight: 600; }
+.z-div { color: var(--div); font-weight: 600; }
+
+/* ---------- LATAR HOLOGRAM ---------- */
+.fx { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+.fx-glow { background:
+  radial-gradient(60% 50% at 35% 30%, rgba(63, 224, 255, .10), transparent 70%),
+  radial-gradient(40% 40% at 85% 85%, rgba(232, 193, 112, .06), transparent 70%); }
+.fx-grid {
+  background-image:
+    linear-gradient(var(--line-soft) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+  background-size: 44px 44px;
+  opacity: .35;
+  -webkit-mask-image: radial-gradient(ellipse at 50% 35%, #000 20%, transparent 75%);
+  mask-image: radial-gradient(ellipse at 50% 35%, #000 20%, transparent 75%);
+}
+.fx-scan { background: repeating-linear-gradient(0deg, rgba(255,255,255,.025) 0 1px, transparent 1px 3px); }
+.fx-beam { height: 160px; top: -160px; bottom: auto;
+  background: linear-gradient(180deg, transparent, rgba(63, 224, 255, .06) 50%, transparent);
+  animation: beam 9s linear infinite; }
+@keyframes beam { to { transform: translateY(calc(100vh + 160px)); } }
+
+/* ---------- BOOT ---------- */
+.boot { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: radial-gradient(circle at 50% 45%, #0a1c2b, var(--bg) 70%); cursor: pointer;
+  padding: max(16px, env(safe-area-inset-left, 0px)); transition: opacity .45s ease; }
+.boot.out { opacity: 0; pointer-events: none; }
+.boot-inner { width: min(440px, 100%); display: grid; gap: 14px; justify-items: center; text-align: center; }
+.boot-core { width: 132px; height: 132px; }
+.boot-core .r1 { transform-origin: 66px 66px; animation: spin 2.4s linear infinite; }
+.boot-core .r2 { transform-origin: 66px 66px; animation: spin 3.6s linear infinite reverse; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.boot-title { font-size: 24px; font-weight: 700; letter-spacing: .18em; text-shadow: 0 0 18px rgba(63, 224, 255, .55); }
+.boot-title span { color: var(--gold); }
+.boot-log { width: 100%; min-height: 128px; font-family: var(--font-mono); font-size: 12px; text-align: left; color: var(--muted); }
+.boot-log div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; animation: type .25s steps(18) both; }
+.boot-log b { color: var(--cyan); font-weight: 600; }
+.boot-log b.warn { color: var(--avoid); }
+@keyframes type { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+.boot-bar { width: 100%; height: 3px; background: var(--line-soft); overflow: hidden; }
+.boot-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--cyan), var(--gold)); box-shadow: 0 0 10px var(--cyan); transition: width .25s ease; }
+.boot-skip { font-size: 11px; letter-spacing: .2em; color: var(--muted); text-transform: uppercase; }
+
+/* ---------- BAR KOMANDO ---------- */
+.cmdbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 50; background: rgba(4, 8, 14, .88); border-bottom: 1px solid var(--line);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.cmdbar-inner { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding-block: 10px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.brand { display: flex; align-items: center; gap: 10px; margin-right: auto; min-width: 0; }
+.brand svg { width: 34px; height: 34px; flex: none; filter: drop-shadow(0 0 6px rgba(63, 224, 255, .6)); }
+.brand-title { font-size: 18px; font-weight: 700; letter-spacing: .14em; line-height: 1.1; white-space: nowrap; }
+.brand-title span { color: var(--gold); }
+.brand-sub { font-size: 10.5px; letter-spacing: .22em; color: var(--muted); text-transform: uppercase; white-space: nowrap; }
+.status-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pill { display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 10px; border: 1px solid var(--line); font-size: 11.5px; font-weight: 600;
+  letter-spacing: .12em; text-transform: uppercase; background: rgba(7, 18, 28, .8); white-space: nowrap;
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px); }
+.pill i { width: 7px; height: 7px; border-radius: 50%; background: var(--neu); flex: none; }
+.pill.ok { border-color: rgba(46, 230, 160, .5); } .pill.ok i { background: var(--mom); box-shadow: 0 0 8px var(--mom); animation: blink 1.6s infinite; }
+.pill.bad { border-color: rgba(255, 77, 106, .6); color: #ffc4cd; } .pill.bad i { background: var(--avoid); box-shadow: 0 0 8px var(--avoid); animation: blink .8s infinite; }
+.pill.sim { border-color: rgba(232, 193, 112, .6); color: var(--gold); } .pill.sim i { background: var(--gold); }
+.pill.dim i { background: var(--neu); }
+@keyframes blink { 50% { opacity: .35; } }
+.clock { display: inline-flex; align-items: baseline; gap: 6px; font-family: var(--font-mono); font-size: 13px; }
+.clock small { font-family: var(--font-display); font-size: 10px; letter-spacing: .18em; color: var(--muted); }
+.toggle { display: inline-flex; align-items: center; gap: 7px; font-size: 11px; letter-spacing: .14em; color: var(--muted); cursor: pointer; user-select: none; }
+.toggle input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.toggle span { width: 30px; height: 14px; border: 1px solid var(--line); position: relative; transition: border-color .2s; }
+.toggle span::after { content: ""; position: absolute; top: 2px; left: 2px; width: 8px; height: 8px; background: var(--muted); transition: transform .2s, background .2s; }
+.toggle input:checked + span { border-color: var(--cyan); }
+.toggle input:checked + span::after { transform: translateX(16px); background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+.toggle input:focus-visible + span { outline: 2px solid var(--gold); outline-offset: 2px; }
+.btn-hud { height: 30px; padding: 0 16px; border: 1px solid var(--cyan); background: rgba(63, 224, 255, .1); color: var(--cyan); font-weight: 700;
+  letter-spacing: .16em; font-size: 12px; cursor: pointer; text-transform: uppercase;
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); transition: background .2s, box-shadow .2s; }
+.btn-hud:hover { background: rgba(63, 224, 255, .2); box-shadow: inset 0 0 12px rgba(63, 224, 255, .4); }
+.btn-hud:disabled { opacity: .55; cursor: progress; }
+.btn-mini { border: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 10.5px; letter-spacing: .16em; padding: 3px 9px; cursor: pointer; text-transform: uppercase; }
+.btn-mini:hover { color: var(--cyan); border-color: var(--cyan); }
+
+/* ---------- KERANGKA ---------- */
+main { position: relative; z-index: 1; display: grid; gap: 16px; padding-block: 16px 28px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); max-width: 1500px; margin: 0 auto; }
+.grid-top { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 1000px) { .grid-top { grid-template-columns: minmax(0, 1fr); } }
+
+.panel { position: relative; min-width: 0; padding: 1px; background: linear-gradient(160deg, var(--line), rgba(63, 224, 255, .08) 45%, rgba(232, 193, 112, .28));
+  clip-path: polygon(var(--chamfer) 0, 100% 0, 100% calc(100% - var(--chamfer)), calc(100% - var(--chamfer)) 100%, 0 100%, 0 var(--chamfer)); }
+.panel-body { position: relative; height: 100%; background: linear-gradient(180deg, var(--panel-2), var(--panel) 120px);
+  clip-path: polygon(calc(var(--chamfer) - .5px) 0, 100% 0, 100% calc(100% - var(--chamfer) + .5px), calc(100% - var(--chamfer) + .5px) 100%, 0 100%, 0 calc(var(--chamfer) - .5px));
+  padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.panel-body::after { content: ""; position: absolute; top: 0; right: 0; width: 22px; height: 22px; border-top: 2px solid var(--gold); border-right: 2px solid var(--gold); pointer-events: none; }
+.panel-body::before { content: ""; position: absolute; bottom: 0; left: 0; width: 22px; height: 22px; border-bottom: 2px solid var(--gold); border-left: 2px solid var(--gold); pointer-events: none; }
+.panel-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.panel-head h2 { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; text-wrap: balance; }
+.panel-head .tag { font-family: var(--font-mono); font-size: 11px; color: var(--gold); border: 1px solid var(--gold-dim); padding: 1px 6px; }
+.panel-head .meta { margin-left: auto; font-size: 11px; color: var(--muted); letter-spacing: .08em; }
+.panel-head::after { content: ""; flex: 1 1 40px; order: 2; height: 1px; background: linear-gradient(90deg, var(--line), transparent); min-width: 20px; }
+.panel-head .meta { order: 3; margin-left: 0; }
+
+.reveal .panel { animation: rise .7s cubic-bezier(.2, .7, .2, 1) both; }
+.reveal .panel:nth-of-type(2) { animation-delay: .08s; }
+.reveal section:nth-of-type(2) .panel, .reveal > .panel:nth-of-type(1) { animation-delay: .14s; }
+@keyframes rise { from { opacity: .001; transform: translateY(14px); } }
+
+/* ---------- RADAR ---------- */
+.radar-wrap { position: relative; margin: 0 -6px; }
+#graph { height: 540px; width: 100%; }
+@media (max-width: 1000px) { #graph { height: 440px; } }
+@media (max-width: 560px) { #graph { height: 360px; } }
+#graph .vis-network { outline: none; }
+.radar-foot { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-size: 11px; color: var(--muted); letter-spacing: .06em; }
+.lg { display: inline-flex; align-items: center; gap: 6px; }
+.lg i { width: 9px; height: 9px; border-radius: 50%; }
+.radar-foot .btn-mini { margin-left: auto; }
+div.vis-tooltip { background: rgba(4, 12, 20, .95) !important; border: 1px solid var(--line) !important; color: var(--text) !important; font-family: var(--font-mono) !important;
+  font-size: 12px !important; border-radius: 0 !important; padding: 8px 10px !important; box-shadow: 0 0 18px rgba(63, 224, 255, .25) !important; }
+.tip-t { font-family: var(--font-display); font-weight: 700; letter-spacing: .1em; color: var(--cyan); }
+
+/* ---------- TARGET LOCK ---------- */
+.lock-empty { color: var(--muted); font-size: 13px; }
+.lock-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.lock-ticker { font-size: 34px; font-weight: 700; letter-spacing: .08em; line-height: 1; text-shadow: 0 0 16px rgba(63, 224, 255, .45); }
+.lock-sub { font-family: var(--font-mono); font-size: 12px; color: var(--muted); margin-top: 6px; }
+.lock-anim { animation: lockin .45s cubic-bezier(.2, .8, .2, 1); }
+@keyframes lockin { from { opacity: .2; transform: scale(.985); filter: brightness(1.6); } }
+.label { font-size: 10.5px; letter-spacing: .18em; color: var(--muted); text-transform: uppercase; }
+.zgauge { position: relative; height: 34px; margin-top: 26px; }
+.zgauge .zone { position: absolute; top: 10px; height: 10px; }
+.zone.z-d { background: linear-gradient(90deg, rgba(176, 124, 255, .15), rgba(176, 124, 255, .55)); }
+.zone.z-b { background: rgba(255, 182, 39, .75); box-shadow: 0 0 12px rgba(255, 182, 39, .45); }
+.zone.z-m { background: linear-gradient(90deg, rgba(46, 230, 160, .55), rgba(46, 230, 160, .12)); }
+.zgauge .tick { position: absolute; top: 22px; font-family: var(--font-mono); font-size: 10px; color: var(--muted); transform: translateX(-50%); }
+.zgauge .tick::before { content: ""; position: absolute; left: 50%; top: -3px; width: 1px; height: 3px; background: var(--muted); }
+.zmark { position: absolute; top: 0; transform: translateX(-50%); transition: left .6s cubic-bezier(.2, .8, .2, 1); }
+.zmark::before { content: ""; display: block; width: 2px; height: 30px; margin: 0 auto; background: #fff; box-shadow: 0 0 8px #fff; }
+.zmark span { position: absolute; bottom: 31px; left: 50%; transform: translateX(-50%); font-family: var(--font-mono); font-size: 12px; font-weight: 600; white-space: nowrap;
+  background: #fff; color: #04080e; padding: 0 5px; }
+.zlegend { position: relative; height: 14px; font-size: 9.5px; letter-spacing: .16em; }
+.zlegend span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.znote { font-size: 11.5px; color: var(--muted); }
+.statgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 12px; }
+.stat b { display: block; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 600; margin-top: 2px; }
+.stat small { font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); }
+.lock-levels { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 14px; align-items: stretch; }
+@media (max-width: 420px) { .lock-levels { grid-template-columns: 112px minmax(0, 1fr); } .statgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.ladder { position: relative; height: 168px; margin: 8px 0; }
+.ladder-track { position: absolute; left: 6px; top: 0; bottom: 0; width: 3px; background: linear-gradient(180deg, var(--mom), var(--cyan) 50%, var(--avoid)); box-shadow: 0 0 10px rgba(63, 224, 255, .5); }
+.rung { position: absolute; left: 0; right: 0; transform: translateY(-50%); display: flex; align-items: center; gap: 6px; padding-left: 18px; font-family: var(--font-mono); font-size: 12px; }
+.rung::before { content: ""; position: absolute; left: 1px; width: 13px; height: 2px; background: currentColor; box-shadow: 0 0 6px currentColor; }
+.rung em { font-style: normal; font-family: var(--font-display); font-size: 10px; letter-spacing: .14em; color: var(--muted); }
+.rung.tp { color: var(--mom); } .rung.sl { color: var(--avoid); } .rung.en { color: var(--cyan); }
+.rung small { color: var(--muted); }
+.levels-info { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-content: center; }
+.explain { margin: 0; font-size: 13px; color: #a9c9d8; border-left: 2px solid var(--gold-dim); padding-left: 10px; }
+.explain-note { font-size: 11.5px; color: var(--muted); font-style: italic; }
+
+/* ---------- BADGE ---------- */
+.badge { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; font-size: 11px; font-weight: 700; letter-spacing: .12em; white-space: nowrap; border: 1px solid currentColor; }
+.b-BUY_LAGGING { background: var(--buy); color: #1d1200; border-color: var(--buy); box-shadow: 0 0 14px rgba(255, 182, 39, .5); }
+.b-MOMENTUM { color: var(--mom); background: var(--mom-a); }
+.b-DIVERGENT { color: var(--div); background: var(--div-a); }
+.b-AVOID { color: var(--avoid); background: var(--avoid-a); }
+.b-NEUTRAL { color: var(--neu); background: var(--neu-a); }
+.b-g { height: 20px; font-size: 10px; padding: 0 7px; }
+.g-PASSED { color: var(--mom); } .g-NO_NEWS { color: var(--neu); } .g-BYPASSED { color: var(--buy); } .g-REJECTED { color: var(--avoid); }
+.o-OPEN { color: var(--cyan); } .o-TP { color: var(--mom); } .o-SL { color: var(--avoid); } .o-TIMEOUT { color: var(--neu); } .o-EXPIRED { color: #4d5f6b; }
+
+/* ---------- PAPAN SINYAL ---------- */
+.summary { display: flex; gap: 6px; flex-wrap: wrap; order: 3; }
+.tbl-wrap { overflow-x: auto; margin: 0 -16px; padding: 0 16px; }
+table.hud { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.hud th { font-size: 10.5px; font-weight: 600; letter-spacing: .16em; color: var(--muted); text-transform: uppercase; text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.hud td { padding: 9px 10px; border-bottom: 1px solid var(--line-soft); white-space: nowrap; font-family: var(--font-mono); font-size: 13px; }
+.hud .r { text-align: right; }
+.hud td.tk { font-family: var(--font-display); font-weight: 700; font-size: 15px; letter-spacing: .08em; }
+.hud tbody tr.sel { background: rgba(63, 224, 255, .07); box-shadow: inset 2px 0 0 var(--cyan); }
+.hud tbody tr.buy { box-shadow: inset 3px 0 0 var(--buy); }
+.hud tbody tr.buy.sel { box-shadow: inset 3px 0 0 var(--buy); background: rgba(255, 182, 39, .08); }
+.hud tbody tr.click { cursor: pointer; transition: background .15s; }
+.hud tbody tr.click:hover { background: rgba(63, 224, 255, .05); }
+.empty-row td { text-align: center; color: var(--muted); padding: 22px; font-family: var(--font-display); white-space: normal; }
+.flash { animation: flash 1.2s ease; }
+@keyframes flash { 0% { color: #fff; text-shadow: 0 0 10px var(--cyan); } }
+.cards { display: none; gap: 10px; }
+.card { text-align: left; width: 100%; border: 1px solid var(--line-soft); background: rgba(10, 26, 39, .7); padding: 12px; cursor: pointer; display: grid; gap: 10px;
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); }
+.card.buy { border-color: rgba(255, 182, 39, .6); box-shadow: inset 3px 0 0 var(--buy); }
+.card.sel { border-color: var(--cyan); background: rgba(63, 224, 255, .07); }
+.card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.card-top b { font-size: 18px; letter-spacing: .08em; }
+.card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.card-grid span { font-size: 9.5px; letter-spacing: .14em; color: var(--muted); text-transform: uppercase; }
+.card-grid b { display: block; font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--text); letter-spacing: 0; text-transform: none; }
+@media (max-width: 760px) { .tbl-signal { display: none; } .cards { display: grid; } }
+.skipped { font-size: 11.5px; color: var(--muted); }
+.skipped b { color: var(--text); }
+
+/* ---------- KINERJA ---------- */
+.perf-top { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 18px; align-items: center; }
+@media (max-width: 760px) { .perf-top { grid-template-columns: minmax(0, 1fr); } }
+.rings { display: flex; gap: 14px; justify-content: center; }
+.ring { position: relative; width: 116px; height: 116px; }
+.ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring .bg { fill: none; stroke: var(--line-soft); stroke-width: 7; }
+.ring .fg { fill: none; stroke-width: 7; stroke-linecap: butt; animation: ringin 1.3s cubic-bezier(.2, .8, .2, 1) both; filter: drop-shadow(0 0 4px currentColor); }
+.ring .tk { fill: none; stroke: var(--line); stroke-width: 1; stroke-dasharray: 1 7.8; }
+@keyframes ringin { from { stroke-dashoffset: var(--c); } }
+.ring-txt { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+.ring-txt b { font-family: var(--font-mono); font-size: 20px; font-weight: 600; }
+.ring-txt small { font-size: 9px; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; max-width: 74px; line-height: 1.15; margin: 2px auto 0; }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 560px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.kpi { border-left: 2px solid var(--gold-dim); padding: 2px 0 2px 10px; }
+.kpi b { display: block; font-family: var(--font-mono); font-size: 17px; font-weight: 600; margin-top: 2px; }
+.kpi small { font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); }
+.equity { display: grid; gap: 6px; }
+.equity-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.equity-head b { font-family: var(--font-mono); font-size: 15px; }
+.equity svg { width: 100%; height: 130px; display: block; }
+.equity-axis { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); }
+.perf-tables { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+@media (max-width: 900px) { .perf-tables { grid-template-columns: minmax(0, 1fr); } }
+.hud.sm td { padding: 6px 8px; font-size: 12px; }
+.hud.sm th { padding: 5px 8px; }
+.note { font-size: 12px; padding: 8px 10px; border: 1px dashed var(--gold-dim); color: var(--gold); }
+.note.err { border-color: var(--avoid); color: #ffc4cd; }
+
+/* ---------- LOG MISI ---------- */
+.log { font-family: var(--font-mono); font-size: 12.5px; display: grid; gap: 2px; max-height: 360px; overflow: auto; }
+.log-line { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; padding: 6px 8px; border-left: 2px solid var(--line-soft); }
+.log-line:hover { background: rgba(63, 224, 255, .04); border-left-color: var(--cyan); }
+.log-line .t { color: var(--muted); }
+.log-line .tk { font-family: var(--font-display); font-weight: 700; letter-spacing: .08em; color: var(--text); min-width: 46px; }
+.log-line .arrow { color: var(--gold-dim); }
+.log-line .why { color: var(--muted); font-size: 11.5px; flex-basis: 100%; padding-left: 2px; }
+
+/* ---------- KALIBRASI ---------- */
+.calib-body { display: grid; gap: 14px; }
+.calib-hint { font-size: 11px; color: var(--muted); }
+.sliders { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
+@media (max-width: 900px) { .sliders { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .sliders { grid-template-columns: minmax(0, 1fr); } }
+.slider label { display: flex; justify-content: space-between; gap: 8px; }
+.slider label b { font-family: var(--font-mono); color: var(--gold); font-size: 12px; }
+input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 22px; background: transparent; }
+input[type=range]::-webkit-slider-runnable-track { height: 2px; background: linear-gradient(90deg, var(--cyan), var(--line-soft)); }
+input[type=range]::-moz-range-track { height: 2px; background: var(--line); }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 16px; margin-top: -7px; background: var(--gold); box-shadow: 0 0 8px var(--gold); border: 0; }
+input[type=range]::-moz-range-thumb { width: 12px; height: 16px; background: var(--gold); border: 0; border-radius: 0; }
+.calib-foot { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; font-size: 11.5px; color: var(--muted); }
+
+/* ---------- ALERT & TOAST ---------- */
+.hud-alert { display: flex; gap: 10px; align-items: flex-start; padding: 9px 12px; border: 1px solid; font-size: 13px; position: relative; z-index: 1; }
+.hud-alert.danger { border-color: var(--avoid); background: var(--avoid-a); color: #ffd3da; }
+.hud-alert.info { border-color: var(--gold-dim); background: rgba(232, 193, 112, .08); color: var(--gold); }
+.hud-alert button { margin-left: auto; background: none; border: 0; color: inherit; cursor: pointer; font-size: 16px; line-height: 1; padding: 0 2px; }
+.toast { position: fixed; z-index: 80; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+  background: rgba(10, 10, 4, .92); border: 1px solid var(--buy); color: var(--buy); padding: 10px 18px; text-align: center; min-width: 240px; max-width: calc(100vw - 32px);
+  box-shadow: 0 0 28px rgba(255, 182, 39, .45); transition: opacity .3s, transform .3s;
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); }
+.toast.on { opacity: 1; transform: translate(-50%, 0); }
+.toast b { display: block; font-size: 15px; letter-spacing: .3em; }
+.toast span { font-family: var(--font-mono); font-size: 13px; color: var(--text); }
+
+footer.disc { font-size: 11.5px; color: var(--muted); max-width: 95ch; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .fx-beam { display: none; }
+}
+</style>
 </head>
 <body>
 
-<!-- ========== TOP BAR ========== -->
-<nav class="navbar navbar-dss sticky-top">
-  <div class="container-fluid px-3 px-md-4 py-1 d-flex flex-wrap align-items-center gap-2">
-    <div class="d-flex align-items-center gap-2 me-auto">
-      <span class="fs-5 fw-bold">Stock SNA DSS</span>
-      <span class="text-muted-dss d-none d-md-inline small">Social Network Analysis &middot; Day Trading</span>
-    </div>
-    <div class="d-flex flex-wrap align-items-center gap-2">
-      <span id="statusBadge" class="badge text-bg-secondary">Memuat...</span>
-      <span id="marketBadge" class="badge text-bg-secondary">Pasar: -</span>
-      <span id="lastUpdated" class="text-muted-dss small">Last updated: -</span>
-      <div class="form-check form-switch mb-0 ms-1">
-        <input class="form-check-input" type="checkbox" role="switch" id="autoRefresh" checked>
-        <label class="form-check-label small" for="autoRefresh">Auto 60s</label>
+<div class="fx fx-glow"></div>
+<div class="fx fx-grid"></div>
+<div class="fx fx-beam"></div>
+<div class="fx fx-scan"></div>
+
+<!-- ========== BOOT SEQUENCE ========== -->
+<div id="boot" class="boot" hidden>
+  <div class="boot-inner">
+    <svg class="boot-core" viewBox="0 0 132 132" aria-hidden="true">
+      <circle cx="66" cy="66" r="62" fill="none" stroke="rgba(63,224,255,.18)" stroke-width="1"/>
+      <g class="r1"><circle cx="66" cy="66" r="52" fill="none" stroke="#3fe0ff" stroke-width="3" stroke-dasharray="40 14"/></g>
+      <g class="r2"><circle cx="66" cy="66" r="40" fill="none" stroke="#e8c170" stroke-width="2" stroke-dasharray="6 8"/></g>
+      <circle cx="66" cy="66" r="22" fill="rgba(63,224,255,.15)" stroke="#3fe0ff" stroke-width="1.5"/>
+      <circle cx="66" cy="66" r="7" fill="#d6f4ff"/>
+    </svg>
+    <div class="boot-title">STOCK SNA <span>//</span> DSS</div>
+    <div id="bootLog" class="boot-log"></div>
+    <div class="boot-bar"><i id="bootBar"></i></div>
+    <div class="boot-skip">ketuk untuk lewati</div>
+  </div>
+</div>
+
+<!-- ========== BAR KOMANDO ========== -->
+<header class="cmdbar">
+  <div class="cmdbar-inner">
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true">
+        <polygon points="20,2 36,11 36,29 20,38 4,29 4,11" fill="rgba(63,224,255,.08)" stroke="#3fe0ff" stroke-width="1.5"/>
+        <circle cx="20" cy="20" r="3.2" fill="#e8c170"/>
+        <circle cx="20" cy="9" r="2" fill="#3fe0ff"/><circle cx="29.5" cy="25.5" r="2" fill="#3fe0ff"/><circle cx="10.5" cy="25.5" r="2" fill="#3fe0ff"/>
+        <path d="M20 20 L20 9 M20 20 L29.5 25.5 M20 20 L10.5 25.5" stroke="#3fe0ff" stroke-width="1"/>
+      </svg>
+      <div>
+        <div class="brand-title">STOCK SNA <span>//</span> DSS</div>
+        <div class="brand-sub">Market HUD · Social Network Analysis</div>
       </div>
-      <button id="btnRefresh" class="btn btn-sm btn-primary" type="button">
-        <span id="btnSpinner" class="spinner-border spinner-border-sm d-none" aria-hidden="true"></span>
-        <span id="btnLabel">Refresh Data</span>
-      </button>
+    </div>
+    <div class="status-row">
+      <span id="pillLive" class="pill dim"><i></i><span>MEMUAT</span></span>
+      <span id="pillMarket" class="pill dim"><i></i><span>PASAR</span></span>
+      <span id="pillAge" class="pill dim"><i></i><span class="mono">DATA -</span></span>
+      <span class="clock"><small>NY</small><b id="clkNy">--:--</b></span>
+      <span class="clock"><small>WIB</small><b id="clkWib">--:--:--</b></span>
+      <label class="toggle" for="autoRefresh"><input type="checkbox" id="autoRefresh" checked><span></span>AUTO 60S</label>
+      <label class="toggle" for="sfx"><input type="checkbox" id="sfx"><span></span>SUARA</label>
+      <button id="btnRefresh" class="btn-hud" type="button"><span id="btnLabel">Refresh</span></button>
     </div>
   </div>
-</nav>
+</header>
 
-<main class="container-fluid px-3 px-md-4 py-3">
-
+<main id="main">
   <div id="alertBox"></div>
 
-  <!-- ========== PENGATURAN THRESHOLD ========== -->
-  <div class="card card-dss mb-3">
-    <div class="card-header d-flex justify-content-between align-items-center" role="button" data-bs-toggle="collapse" data-bs-target="#settingsBody" aria-expanded="false">
-      <span>Pengaturan Threshold Tampilan</span>
-      <span class="small text-muted-dss">klik untuk buka/tutup</span>
-    </div>
-    <div id="settingsBody" class="collapse">
-      <div class="card-body">
-        <div class="row g-4">
-          <div class="col-md-6 col-xl-3">
-            <label for="rngQqq" class="form-label small-label">Return 15m QQQ minimal (%) &mdash; <span id="lblQqq" class="text-light"></span></label>
-            <input type="range" class="form-range" id="rngQqq" min="0.05" max="1" step="0.05">
-          </div>
-          <div class="col-md-6 col-xl-3">
-            <label for="rngCorr" class="form-label small-label">Korelasi minimal (r) &mdash; <span id="lblCorr" class="text-light"></span></label>
-            <input type="range" class="form-range" id="rngCorr" min="0.3" max="0.95" step="0.05">
-          </div>
-          <div class="col-md-6 col-xl-3">
-            <label for="rngZLag" class="form-label small-label">Lag z untuk BUY (tertinggal) &mdash; <span id="lblZLag" class="text-light"></span></label>
-            <input type="range" class="form-range" id="rngZLag" min="0.5" max="2.5" step="0.1">
-          </div>
-          <div class="col-md-6 col-xl-3">
-            <label for="rngZDiv" class="form-label small-label">Lag z untuk DIVERGENT &mdash; <span id="lblZDiv" class="text-light"></span></label>
-            <input type="range" class="form-range" id="rngZDiv" min="1.5" max="5" step="0.25">
-          </div>
+  <section class="grid-top">
+    <!-- RADAR -->
+    <div class="panel">
+      <div class="panel-body">
+        <div class="panel-head">
+          <span class="tag">HUB QQQ</span><h2>Radar Korelasi</h2>
+          <span class="meta" id="radarMeta">jarak ke inti = kekuatan korelasi</span>
         </div>
-        <div class="d-flex flex-wrap align-items-center gap-3 mt-3">
-          <button id="btnResetCfg" class="btn btn-sm btn-outline-secondary" type="button">Reset ke default (0.2% / 0.75 / z -1.0 / z -3.0)</button>
-          <span class="tiny text-muted-dss">Lag z = (return saham &minus; β &times; return QQQ) &divide; simpangan residual 15m. Slider ini hanya mengubah tampilan di browser Anda; alert Telegram dan riwayat memakai threshold server.</span>
-        </div>
-        <div id="serverCfg" class="tiny text-muted-dss mt-2"></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="row g-3 mb-3">
-    <!-- ========== ZONA 1: SNA GRAPH ========== -->
-    <div class="col-lg-8">
-      <div class="card card-dss h-100">
-        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-          <span>Zona 1 &mdash; SNA Graph (Hub: QQQ)</span>
-          <span class="small text-muted-dss">
-            <span class="legend-dot" style="background:var(--green)"></span>Synced/Momentum
-            <span class="legend-dot ms-2" style="background:var(--yellow)"></span>Lagging (BUY)
-            <span class="legend-dot ms-2" style="background:var(--purple)"></span>Divergent
-            <span class="legend-dot ms-2" style="background:var(--gray)"></span>Neutral
-            <span class="legend-dot ms-2" style="background:var(--red)"></span>Avoid
-          </span>
-        </div>
-        <div id="graph"></div>
-        <div class="card-footer bg-transparent small text-muted-dss d-flex flex-wrap justify-content-between align-items-center gap-2" style="border-color:var(--card-border)!important">
-          <span>
-            <span class="legend-line"></span>Garis tebal = korelasi tinggi &nbsp;
-            <span class="legend-line dashed"></span>Putus-putus = korelasi negatif &nbsp;&middot;&nbsp; Dekat hub = korelasi kuat. Klik node untuk detail.
-          </span>
-          <button id="btnResetView" class="btn btn-sm btn-outline-secondary py-0" type="button">Reset tampilan</button>
+        <div class="radar-wrap"><div id="graph" role="img" aria-label="Radar korelasi saham terhadap QQQ"></div></div>
+        <div class="radar-foot">
+          <span class="lg"><i style="background:var(--buy)"></i>BUY LAGGING</span>
+          <span class="lg"><i style="background:var(--mom)"></i>MOMENTUM</span>
+          <span class="lg"><i style="background:var(--div)"></i>DIVERGENT</span>
+          <span class="lg"><i style="background:var(--avoid)"></i>AVOID</span>
+          <span class="lg"><i style="background:var(--neu)"></i>NEUTRAL</span>
+          <span class="lg"><i style="background:none;border:1px dashed var(--gold);border-radius:50%"></i>ambang r</span>
+          <button id="btnResetView" class="btn-mini" type="button">Reset view</button>
         </div>
       </div>
     </div>
 
-    <!-- ========== DETAIL PANEL ========== -->
-    <div class="col-lg-4">
-      <div class="card card-dss h-100">
-        <div class="card-header">Detail Saham</div>
-        <div class="card-body" id="detailPanel">
-          <p class="text-muted-dss mb-0">Klik sebuah node di graph atau baris di tabel untuk melihat detail dan alasan sinyal.</p>
-        </div>
+    <!-- TARGET LOCK -->
+    <div class="panel">
+      <div class="panel-body">
+        <div class="panel-head"><span class="tag">TARGET</span><h2>Target Lock</h2></div>
+        <div id="detailPanel"><p class="lock-empty">Pilih node di radar atau saham di papan sinyal.</p></div>
       </div>
     </div>
-  </div>
+  </section>
 
-  <!-- ========== ZONA 2: TABEL SINYAL ========== -->
-  <div class="card card-dss mb-3">
-    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-      <span>Zona 2 &mdash; Tabel Sinyal DSS</span>
-      <span id="signalSummary" class="small"></span>
+  <!-- PAPAN SINYAL -->
+  <section class="panel">
+    <div class="panel-body">
+      <div class="panel-head"><span class="tag">LIVE</span><h2>Papan Sinyal</h2><span id="signalSummary" class="summary"></span></div>
+      <div class="tbl-wrap tbl-signal">
+        <table class="hud">
+          <thead><tr>
+            <th>Ticker</th><th class="r">Harga</th><th class="r">r</th><th class="r nc">β</th><th class="r">Ret 15m</th><th class="r">Ekspektasi</th>
+            <th class="r">Lag z</th><th class="r">Vol 15m</th><th>Sinyal</th><th class="r">SL / TP</th>
+          </tr></thead>
+          <tbody id="signalBody"></tbody>
+        </table>
+      </div>
+      <div id="signalCards" class="cards"></div>
+      <div id="skippedNote" class="skipped"></div>
     </div>
-    <div class="table-responsive">
-      <table class="table table-dss table-hover align-middle">
-        <thead>
-          <tr>
-            <th>Ticker</th>
-            <th class="text-end">Harga</th>
-            <th class="text-end">r</th>
-            <th class="text-end nc">β</th>
-            <th class="text-end">Return 15m</th>
-            <th class="text-end">Ekspektasi</th>
-            <th class="text-end">Lag z</th>
-            <th class="text-end">Volume 15m</th>
-            <th>Sinyal</th>
-            <th class="text-end">SL / TP</th>
-          </tr>
-        </thead>
-        <tbody id="signalBody"></tbody>
-      </table>
-    </div>
-    <div id="skippedNote" class="tiny text-muted-dss px-3 py-2"></div>
-  </div>
+  </section>
 
-  <!-- ========== KINERJA SINYAL ========== -->
-  <div class="card card-dss mb-3">
-    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-      <span>Kinerja Sinyal <span id="perfMode" class="tiny text-muted-dss"></span></span>
-      <span class="tiny text-muted-dss">Sinyal tertutup (TP / SL / batas waktu). Simulasi dari bar 5 menit, belum termasuk komisi &amp; slippage.</span>
-    </div>
-    <div class="card-body">
+  <!-- KINERJA -->
+  <section class="panel">
+    <div class="panel-body">
+      <div class="panel-head"><span class="tag">STAT</span><h2>Kinerja Sinyal</h2><span class="meta" id="perfMode">sinyal tertutup · belum termasuk komisi &amp; slippage</span></div>
       <div id="perfWarn"></div>
-      <div id="perfKpi" class="row g-2 mb-3"></div>
-      <div class="row g-3">
-        <div class="col-lg-6">
-          <div class="small-label mb-1">Per kelompok</div>
-          <div class="table-responsive">
-            <table class="table table-dss table-sm align-middle">
-              <thead><tr><th>Kelompok</th><th class="text-end">N</th><th class="text-end">Win</th><th class="text-end">Rata²</th><th class="text-end">Total</th><th class="text-end">TP/SL/TO</th></tr></thead>
-              <tbody id="perfGroups"></tbody>
-            </table>
-          </div>
+      <div id="perfTop" class="perf-top"></div>
+      <div id="perfEquity" class="equity"></div>
+      <div class="perf-tables">
+        <div class="tbl-wrap">
+          <table class="hud sm">
+            <thead><tr><th>Kelompok</th><th class="r">N</th><th class="r">Win</th><th class="r">Rata²</th><th class="r">Total</th><th class="r">TP/SL/TO</th></tr></thead>
+            <tbody id="perfGroups"></tbody>
+          </table>
         </div>
-        <div class="col-lg-6">
-          <div class="small-label mb-1">Per ticker</div>
-          <div class="table-responsive">
-            <table class="table table-dss table-sm align-middle">
-              <thead><tr><th>Ticker</th><th class="text-end">N</th><th class="text-end">Win</th><th class="text-end">Rata²</th><th class="text-end">Total</th><th class="text-end">TP/SL/TO</th></tr></thead>
-              <tbody id="perfTickers"></tbody>
-            </table>
-          </div>
+        <div class="tbl-wrap">
+          <table class="hud sm">
+            <thead><tr><th>Ticker</th><th class="r">N</th><th class="r">Win</th><th class="r">Rata²</th><th class="r">Total</th><th class="r">TP/SL/TO</th></tr></thead>
+            <tbody id="perfTickers"></tbody>
+          </table>
         </div>
       </div>
     </div>
-  </div>
+  </section>
 
-  <!-- ========== RIWAYAT SINYAL (SUPABASE signal_logs) ========== -->
-  <div class="card card-dss mb-3">
-    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-      <span>Riwayat Sinyal BUY LAGGING <span id="historyMode" class="tiny text-muted-dss"></span></span>
-      <span id="historySummary" class="small"></span>
+  <!-- LOG MISI -->
+  <section class="panel">
+    <div class="panel-body">
+      <div class="panel-head"><span class="tag">LOG</span><h2>Log Misi</h2><span id="historySummary" class="summary"></span></div>
+      <div id="historyMode" class="calib-hint"></div>
+      <div id="historyBody" class="log"></div>
     </div>
-    <div class="table-responsive">
-      <table class="table table-dss table-hover align-middle">
-        <thead>
-          <tr>
-            <th>Waktu (WIB)</th>
-            <th>Ticker</th>
-            <th class="text-end">QQQ 15m</th>
-            <th class="text-end">Saham 15m</th>
-            <th class="text-end">Lag z</th>
-            <th class="text-end">Entry</th>
-            <th class="text-end">SL</th>
-            <th class="text-end">TP</th>
-            <th>Guardrail AI</th>
-            <th>Hasil</th>
-          </tr>
-        </thead>
-        <tbody id="historyBody"></tbody>
-      </table>
-    </div>
-  </div>
+  </section>
 
-  <div class="text-muted-dss small pb-4">
-    <strong>Disclaimer:</strong> Dashboard ini adalah alat bantu keputusan (Decision Support System) untuk tujuan edukasi dan analisis, bukan saran investasi.
-    Sinyal bersifat statistik dan dapat salah. Data berbasis bar 5 menit dan diperbarui tiap beberapa menit, bukan tick real-time. Day trading berisiko tinggi;
-    gunakan manajemen risiko Anda sendiri. Level SL/TP hanyalah ilustrasi, dan kinerja historis tidak menjamin hasil di masa depan.
-  </div>
+  <!-- KALIBRASI -->
+  <section class="panel calib" id="calibPanel">
+    <div class="panel-body">
+      <div class="panel-head"><span class="tag">CFG</span><h2>Kalibrasi Tampilan</h2>
+        <button id="btnCalib" class="btn-mini meta" type="button" aria-expanded="false" aria-controls="calibBody">Buka</button></div>
+      <div id="calibBody" class="calib-body" hidden>
+      <div class="sliders">
+        <div class="slider"><label for="rngQqq" class="label">QQQ 15m minimal <b id="lblQqq"></b></label><input type="range" id="rngQqq" min="0.05" max="1" step="0.05"></div>
+        <div class="slider"><label for="rngCorr" class="label">Korelasi minimal <b id="lblCorr"></b></label><input type="range" id="rngCorr" min="0.3" max="0.95" step="0.05"></div>
+        <div class="slider"><label for="rngZLag" class="label">Lag z BUY <b id="lblZLag"></b></label><input type="range" id="rngZLag" min="0.5" max="2.5" step="0.1"></div>
+        <div class="slider"><label for="rngZDiv" class="label">Lag z DIVERGENT <b id="lblZDiv"></b></label><input type="range" id="rngZDiv" min="1.5" max="5" step="0.25"></div>
+      </div>
+      <div class="calib-foot">
+        <button id="btnResetCfg" class="btn-mini" type="button">Reset default</button>
+        <span>Slider hanya mengubah tampilan di perangkat ini. Alert Telegram dan log memakai threshold server.</span>
+      </div>
+      </div>
+      <div id="serverCfg" class="calib-hint mono"></div>
+    </div>
+  </section>
+
+  <footer class="disc">
+    <strong>Disclaimer:</strong> Alat bantu keputusan untuk edukasi dan analisis, bukan saran investasi. Sinyal bersifat statistik dan dapat salah.
+    Data berbasis bar 5 menit dan diperbarui tiap beberapa menit, bukan tick real-time. Day trading berisiko tinggi; level SL/TP hanya ilustrasi,
+    dan kinerja historis tidak menjamin hasil di masa depan.
+  </footer>
 </main>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
 <script>
 /* =====================================================================
  *  KONFIGURASI
@@ -260,64 +504,55 @@ const SUPABASE_FUNCTION_URL = 'https://hwezplmtngqbblhdaxio.supabase.co/function
 const SUPABASE_URL = 'https://hwezplmtngqbblhdaxio.supabase.co';
 // Anon key bersifat publik (memang untuk frontend). Jangan pernah menaruh service_role key di sini.
 const SUPABASE_ANON_KEY = 'sb_publishable_4SkHZOtDBWLDxrZQvG-kCA_YvCEsYu2';
+// true = paksa mode demo (data simulasi) walau URL sudah diisi. Untuk pratinjau tampilan.
+const DEMO_MODE = false;
 
 const BENCHMARK = 'QQQ';
 const REFRESH_INTERVAL_MS = 60000;   // auto refresh (hanya membaca snapshot, tidak memakai kredit API data)
 const FETCH_TIMEOUT_MS    = 10000;
 const STALE_AFTER_MS      = 480000;  // scan berjalan tiap 5 menit; > 8 menit saat pasar buka dianggap basi
 const HISTORY_LIMIT       = 30;
-const PERF_LIMIT          = 1000;    // jumlah sinyal tertutup terakhir untuk statistik kinerja
+const PERF_LIMIT          = 1000;
 const PERF_MIN_SAMPLE     = 30;
-const DEFAULT_SL_PCT = 0.9;          // hanya dipakai jika server tidak mengirim stop_loss/take_profit
+const DEFAULT_SL_PCT = 0.9;
 const DEFAULT_TP_PCT = 1.5;
 
 const DEFAULT_CFG = { qqqThreshold: 0.2, corrThreshold: 0.75, zLag: 1.0, zDiv: 3.0 };
 const CFG_STORAGE_KEY = 'stockSnaDss.cfg.v3';
+const PREF_STORAGE_KEY = 'stockSnaDss.prefs.v1';
+const BOOT_SESSION_KEY = 'stockSnaDss.booted';
 
-const COLORS = { green: '#28c76f', yellow: '#ffc107', gray: '#6c757d', red: '#ea5455', blue: '#3b82f6', purple: '#a855f7' };
+const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const COARSE = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+
+const COLORS = { cyan: '#3fe0ff', gold: '#e8c170', text: '#d6f4ff', muted: '#6f93a6', bg: '#04080e',
+  buy: '#ffb627', mom: '#2ee6a0', div: '#b07cff', avoid: '#ff4d6a', neu: '#7d909c' };
+const CANVAS_FONT = '"Chakra Petch", "Segoe UI", system-ui, sans-serif';
+const CANVAS_MONO = '"JetBrains Mono", ui-monospace, Menlo, monospace';
 
 const SIGNALS = {
-  BUY_LAGGING: { label: 'BUY LAGGING', badge: 'badge-buy',       color: COLORS.yellow, order: 0 },
-  MOMENTUM:    { label: 'MOMENTUM',    badge: 'badge-momentum',  color: COLORS.green,  order: 1 },
-  DIVERGENT:   { label: 'DIVERGENT',   badge: 'badge-divergent', color: COLORS.purple, order: 2 },
-  AVOID:       { label: 'AVOID',       badge: 'badge-avoid',     color: COLORS.red,    order: 3 },
-  NEUTRAL:     { label: 'NEUTRAL',     badge: 'badge-neutral',   color: COLORS.gray,   order: 4 }
+  BUY_LAGGING: { label: 'BUY LAGGING', short: 'BUY', color: COLORS.buy,   order: 0 },
+  MOMENTUM:    { label: 'MOMENTUM',    short: 'MOM', color: COLORS.mom,   order: 1 },
+  DIVERGENT:   { label: 'DIVERGENT',   short: 'DIV', color: COLORS.div,   order: 2 },
+  AVOID:       { label: 'AVOID',       short: 'AVD', color: COLORS.avoid, order: 3 },
+  NEUTRAL:     { label: 'NEUTRAL',     short: 'NEU', color: COLORS.neu,   order: 4 }
 };
-
-const GUARD = {
-  PASSED:   { label: 'PASSED',   cls: 'text-bg-success' },
-  NO_NEWS:  { label: 'NO NEWS',  cls: 'text-bg-secondary' },
-  BYPASSED: { label: 'BYPASSED', cls: 'text-bg-warning' },
-  REJECTED: { label: 'REJECTED', cls: 'text-bg-danger' }
-};
-
-const OUTCOME = {
-  OPEN:    { label: 'OPEN',    cls: 'text-bg-primary' },
-  TP:      { label: 'TP',      cls: 'text-bg-success' },
-  SL:      { label: 'SL',      cls: 'text-bg-danger' },
-  TIMEOUT: { label: 'TIMEOUT', cls: 'text-bg-secondary' },
-  EXPIRED: { label: 'EXPIRED', cls: 'text-bg-dark border border-secondary' }
-};
+const GUARD = { PASSED: 'PASSED', NO_NEWS: 'NO NEWS', BYPASSED: 'BYPASSED', REJECTED: 'REJECTED' };
+const OUTCOME = { OPEN: 'OPEN', TP: 'TP', SL: 'SL', TIMEOUT: 'TIMEOUT', EXPIRED: 'EXPIRED' };
 
 /* =====================================================================
  *  STATE
  * ===================================================================== */
 const state = {
-  data: null,          // snapshot ternormalisasi (live terakhir yang berhasil, atau simulasi)
-  mode: 'simulation',  // 'live' | 'simulation' | 'none'
-  liveError: null,     // pesan error refresh live terakhir; null jika refresh terakhir sukses
-  selected: null,
-  cfg: loadCfg(),
-  loading: false,
-  lastRefreshAt: 0,
+  data: null, mode: 'simulation', liveError: null,
+  selected: null, lockStart: 0,
+  cfg: loadCfg(), loading: false, lastRefreshAt: 0,
   history: { rows: [], total: null, mode: 'simulation', error: null },
-  perf: { rows: [], mode: 'simulation', error: null }
+  perf: { rows: [], mode: 'simulation', error: null },
+  rows: [], positions: {}, prevSignals: null, acquire: {}, prevVals: {},
+  booting: false, pendingAcquire: false
 };
-
-let network = null;
-let nodesDS = null;
-let edgesDS = null;
-let userMovedView = false;
+let network = null, nodesDS = null, edgesDS = null, userMovedView = false;
 
 /* =====================================================================
  *  UTILITAS
@@ -333,12 +568,7 @@ const rnd = (v, d) => Number(v.toFixed(d));
 function escapeHtml(str) {
   return String(str === null || str === undefined ? '' : str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
-
-// Tanda + hanya untuk nilai positif; nilai negatif membawa tanda '-' sendiri (tidak pernah "+-")
-function fmtPct(v, d = 2) {
-  if (!isNum(v)) return '-';
-  return (v > 0 ? '+' : '') + v.toFixed(d) + '%';
-}
+function fmtPct(v, d = 2) { return isNum(v) ? (v > 0 ? '+' : '') + v.toFixed(d) + '%' : '-'; }
 function fmtNum(v, d = 2) { return isNum(v) ? v.toFixed(d) : '-'; }
 function fmtSigned(v, d = 2) { return isNum(v) ? (v > 0 ? '+' : '') + v.toFixed(d) : '-'; }
 function fmtPrice(v) { return isNum(v) ? '$' + v.toFixed(2) : '-'; }
@@ -350,20 +580,24 @@ function fmtVolume(v) {
   return String(Math.round(v));
 }
 function pctClass(v) { return (!isNum(v) || v === 0) ? '' : (v > 0 ? 'pos' : 'neg'); }
-
 function effZDiv(cfg) { return Math.max(cfg.zDiv, cfg.zLag + 0.1); }
 function zClass(z, cfg) {
   if (!isNum(z)) return '';
-  if (z <= -effZDiv(cfg)) return 'zdiv';
-  if (z <= -cfg.zLag) return 'zlag';
+  if (z <= -effZDiv(cfg)) return 'z-div';
+  if (z <= -cfg.zLag) return 'z-buy';
   return z > 0 ? 'pos' : '';
 }
 
+function storeGet(key, storage = 'local') {
+  try { const s = storage === 'local' ? window.localStorage : window.sessionStorage; return s.getItem(key); } catch (e) { return null; }
+}
+function storeSet(key, val, storage = 'local') {
+  try { const s = storage === 'local' ? window.localStorage : window.sessionStorage; s.setItem(key, val); } catch (e) { /* abaikan */ }
+}
 function loadCfg() {
   try {
-    const raw = localStorage.getItem(CFG_STORAGE_KEY);
+    const raw = storeGet(CFG_STORAGE_KEY);
     if (raw) {
-      // Gabungkan per kunci dengan default, supaya pengaturan yang tidak lengkap tetap terpakai
       const p = JSON.parse(raw);
       const out = Object.assign({}, DEFAULT_CFG);
       Object.keys(DEFAULT_CFG).forEach((k) => { if (isNum(p[k])) out[k] = p[k]; });
@@ -372,13 +606,12 @@ function loadCfg() {
   } catch (e) { /* abaikan */ }
   return Object.assign({}, DEFAULT_CFG);
 }
-function saveCfg() { try { localStorage.setItem(CFG_STORAGE_KEY, JSON.stringify(state.cfg)); } catch (e) { /* abaikan */ } }
+function saveCfg() { storeSet(CFG_STORAGE_KEY, JSON.stringify(state.cfg)); }
 
 function isPlaceholder(s) { return typeof s !== 'string' || !s.startsWith('http') || s.includes('YOUR_'); }
-function isUrlConfigured() { return !isPlaceholder(SUPABASE_FUNCTION_URL); }
+function isUrlConfigured() { return !DEMO_MODE && !isPlaceholder(SUPABASE_FUNCTION_URL); }
 function isAnonKeyConfigured() { return typeof SUPABASE_ANON_KEY === 'string' && SUPABASE_ANON_KEY.length > 20 && !SUPABASE_ANON_KEY.includes('YOUR_'); }
-function isDbConfigured() { return !isPlaceholder(SUPABASE_URL) && isAnonKeyConfigured(); }
-
+function isDbConfigured() { return !DEMO_MODE && !isPlaceholder(SUPABASE_URL) && isAnonKeyConfigured(); }
 function authHeaders() {
   const h = { 'Accept': 'application/json' };
   if (isAnonKeyConfigured()) { h['Authorization'] = 'Bearer ' + SUPABASE_ANON_KEY; h['apikey'] = SUPABASE_ANON_KEY; }
@@ -405,12 +638,10 @@ async function fetchJsonTimeout(url, init) {
 }
 
 /* =====================================================================
- *  JAM PASAR AS (zona waktu New York, DST otomatis; libur bursa tidak dihitung)
+ *  WAKTU
  * ===================================================================== */
 function getMarketStatus(now = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/New_York', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false
-  }).formatToParts(now);
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(now);
   const get = (t) => parts.find((p) => p.type === t).value;
   const wd = get('weekday');
   let h = parseInt(get('hour'), 10);
@@ -420,33 +651,26 @@ function getMarketStatus(now = new Date()) {
   const open = wd !== 'Sat' && wd !== 'Sun' && mins >= 9 * 60 + 30 && mins < 16 * 60;
   return { open, nyTime: String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') };
 }
-
 function fmtWibTime(date, withSeconds = true) {
-  return new Intl.DateTimeFormat('id-ID', {
-    timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', second: withSeconds ? '2-digit' : undefined, hour12: false
-  }).format(date).replace(/\./g, ':');
+  return new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', second: withSeconds ? '2-digit' : undefined, hour12: false })
+    .format(date).replace(/\./g, ':');
 }
 function fmtWibDateTime(date) {
   const p = new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(date);
   const g = (t) => (p.find((x) => x.type === t) || {}).value || '';
-  return g('day') + ' ' + g('month') + ' ' + g('hour') + ':' + g('minute');
+  return (g('day') + ' ' + g('month')).toUpperCase() + ' ' + g('hour') + ':' + g('minute');
 }
 
 /* =====================================================================
  *  DSS ENGINE (lag disesuaikan beta)
  *  ekspektasi = β × return 15m QQQ;  lag z = (return saham − ekspektasi) ÷ σ residual 15m
  *  Jika QQQ > +qqqThreshold dan r ≥ corrThreshold:
- *    DIVERGENT   : z ≤ −zDiv
- *    BUY_LAGGING : −zDiv < z ≤ −zLag
- *    MOMENTUM    : z > −zLag
- *  AVOID   : QQQ < −qqqThreshold dan r ≥ corrThreshold
- *  NEUTRAL : selain itu (termasuk jika z belum tersedia)
+ *    DIVERGENT z ≤ −zDiv · BUY_LAGGING −zDiv < z ≤ −zLag · MOMENTUM z > −zLag
+ *  AVOID: QQQ < −qqqThreshold dan r ≥ corrThreshold · NEUTRAL: selain itu
  * ===================================================================== */
 function classifySignal(stock, bench, cfg) {
   if (!isNum(stock.lag_z)) return 'NEUTRAL';
-  const q = bench.return_15m;
-  const r = stock.correlation;
-  const z = stock.lag_z;
+  const q = bench.return_15m, r = stock.correlation, z = stock.lag_z;
   if (q > cfg.qqqThreshold && r >= cfg.corrThreshold) {
     if (z <= -effZDiv(cfg)) return 'DIVERGENT';
     if (z <= -cfg.zLag) return 'BUY_LAGGING';
@@ -457,23 +681,20 @@ function classifySignal(stock, bench, cfg) {
 }
 
 function explainSignal(stock, bench, cfg, signal) {
-  const q = bench.return_15m;
-  const r = stock.correlation;
-  const t = stock.ticker;
-  const z = stock.lag_z;
+  const q = bench.return_15m, r = stock.correlation, t = stock.ticker, z = stock.lag_z;
   const zs = isNum(z) ? z.toFixed(2) : '-';
   const beta = fmtNum(stock.beta);
   switch (signal) {
     case 'BUY_LAGGING':
-      return `QQQ naik ${fmtPct(q)} dan ${t} berkorelasi kuat (r = ${r.toFixed(2)}). Dengan β ${beta}, ${t} "seharusnya" bergerak ${fmtPct(stock.expected_return)}, `
-           + `tetapi baru ${fmtPct(stock.return_15m)}: tertinggal ${fmtPct(stock.lag_gap)} atau z = ${zs} (BUY jika −${effZDiv(cfg).toFixed(2)} < z ≤ −${cfg.zLag.toFixed(2)}). Berpotensi menyusul (catch-up).`;
+      return `QQQ naik ${fmtPct(q)} dan ${t} berkorelasi kuat (r = ${r.toFixed(2)}). Dengan β ${beta}, ${t} seharusnya bergerak ${fmtPct(stock.expected_return)}, `
+           + `tetapi baru ${fmtPct(stock.return_15m)}: tertinggal ${fmtPct(stock.lag_gap)} (z = ${zs}). Berpotensi menyusul.`;
     case 'MOMENTUM':
       return `QQQ naik ${fmtPct(q)} dan ${t} sudah bergerak sesuai ekspektasi β ${beta} (${fmtPct(stock.return_15m)} vs ${fmtPct(stock.expected_return)}, z = ${zs}). Peluang menyusul kecil.`;
     case 'DIVERGENT':
-      return `QQQ naik ${fmtPct(q)} tetapi ${t} tertinggal sangat jauh dari ekspektasi β ${beta} (${fmtPct(stock.return_15m)} vs ${fmtPct(stock.expected_return)}, z = ${zs} ≤ −${effZDiv(cfg).toFixed(2)}) walau r = ${r.toFixed(2)}. `
-           + `Divergensi sebesar ini biasanya karena faktor khusus perusahaan (berita, rating, dsb.), bukan sekadar tertinggal. Cek berita sebelum mengambil posisi.`;
+      return `QQQ naik ${fmtPct(q)} tetapi ${t} tertinggal sangat jauh dari ekspektasi (${fmtPct(stock.return_15m)} vs ${fmtPct(stock.expected_return)}, z = ${zs}). `
+           + `Divergensi sebesar ini biasanya karena faktor khusus perusahaan. Cek berita sebelum mengambil posisi.`;
     case 'AVOID':
-      return `QQQ turun ${fmtPct(q)} (< -${cfg.qqqThreshold.toFixed(2)}%) dan ${t} berkorelasi kuat (r = ${r.toFixed(2)}, β ${beta}). Risiko ikut tertekan; hindari entri long.`;
+      return `QQQ turun ${fmtPct(q)} dan ${t} berkorelasi kuat (r = ${r.toFixed(2)}, β ${beta}). Risiko ikut tertekan; hindari entri long.`;
     default: {
       const reasons = [];
       if (!isNum(z)) reasons.push('data beta/lag z belum tersedia dari server');
@@ -493,83 +714,51 @@ function computeSignals() {
 }
 
 /* =====================================================================
- *  DATA: LIVE (SUPABASE EDGE FUNCTION, mode baca snapshot)
- *  stocks[i]: ticker, correlation, corr_samples, beta, return_15m, expected_return, lag_gap, lag_z,
- *             resid_sigma_15m, price, volume, atr, stop_loss, take_profit, sl_method
- *  config   : qqq_min_return, corr_min, z_lag, z_divergent, sl_atr, tp_atr, sl_pct, tp_pct, hold_max_min
+ *  DATA LIVE (Edge Function, mode baca snapshot)
  * ===================================================================== */
 function normalizePayload(p) {
   if (!p || typeof p !== 'object') throw new Error('Respons bukan objek JSON');
   const b = p.benchmark;
   if (!b || !isNum(toNum(b.return_15m))) throw new Error('Field benchmark.return_15m tidak valid');
-  // stocks boleh kosong (mis. semua saham dilewati karena data belum cukup); itu tetap data live yang sah
   if (!Array.isArray(p.stocks)) throw new Error('Field stocks tidak valid');
-
   const stocks = p.stocks.map((s, i) => {
     if (!s || typeof s.ticker !== 'string') throw new Error('stocks[' + i + '].ticker tidak valid');
-    const corr = toNum(s.correlation);
-    const ret = toNum(s.return_15m);
+    const corr = toNum(s.correlation), ret = toNum(s.return_15m);
     if (!isNum(corr) || !isNum(ret)) throw new Error('stocks[' + i + '] (' + s.ticker + ') correlation/return_15m tidak valid');
     return {
-      ticker: s.ticker.toUpperCase().slice(0, 10),
-      correlation: clamp(corr, -1, 1),
-      corr_samples: optNum(s.corr_samples),
-      beta: optNum(s.beta),
-      return_15m: ret,
-      expected_return: optNum(s.expected_return),
-      lag_gap: optNum(s.lag_gap),
-      lag_z: optNum(s.lag_z),
-      resid_sigma_15m: optNum(s.resid_sigma_15m),
-      price: optNum(s.price),
-      volume: optNum(s.volume),
-      atr: optNum(s.atr),
-      stop_loss: optNum(s.stop_loss),
-      take_profit: optNum(s.take_profit),
+      ticker: s.ticker.toUpperCase().slice(0, 10), correlation: clamp(corr, -1, 1), corr_samples: optNum(s.corr_samples),
+      beta: optNum(s.beta), return_15m: ret, expected_return: optNum(s.expected_return), lag_gap: optNum(s.lag_gap),
+      lag_z: optNum(s.lag_z), resid_sigma_15m: optNum(s.resid_sigma_15m), price: optNum(s.price), volume: optNum(s.volume),
+      atr: optNum(s.atr), stop_loss: optNum(s.stop_loss), take_profit: optNum(s.take_profit),
       sl_method: s.sl_method === 'ATR' || s.sl_method === 'PCT' ? s.sl_method : null
     };
   });
-
-  let ts = new Date(p.timestamp);
-  if (isNaN(ts.getTime())) ts = new Date();
-  let gen = new Date(p.generated_at);
-  if (isNaN(gen.getTime())) gen = ts;
-
+  let ts = new Date(p.timestamp); if (isNaN(ts.getTime())) ts = new Date();
+  let gen = new Date(p.generated_at); if (isNaN(gen.getTime())) gen = ts;
   const c = p.config && typeof p.config === 'object' ? p.config : null;
   return {
-    timestamp: ts.toISOString(),
-    generated_at: gen.toISOString(),
+    timestamp: ts.toISOString(), generated_at: gen.toISOString(),
     market_open: typeof p.market_open === 'boolean' ? p.market_open : getMarketStatus().open,
     fresh: typeof p.fresh === 'boolean' ? p.fresh : true,
-    benchmark: {
-      ticker: typeof b.ticker === 'string' ? b.ticker.toUpperCase() : BENCHMARK,
-      return_15m: toNum(b.return_15m),
-      price: optNum(b.price),
-      volume: optNum(b.volume)
-    },
+    benchmark: { ticker: typeof b.ticker === 'string' ? b.ticker.toUpperCase() : BENCHMARK, return_15m: toNum(b.return_15m), price: optNum(b.price), volume: optNum(b.volume) },
     stocks,
     skipped: Array.isArray(p.skipped) ? p.skipped.filter((x) => x && typeof x.ticker === 'string').map((x) => ({ ticker: x.ticker, reason: String(x.reason || '') })) : [],
-    config: c ? {
-      qqq: optNum(c.qqq_min_return), corr: optNum(c.corr_min), zLag: optNum(c.z_lag), zDiv: optNum(c.z_divergent),
-      slAtr: optNum(c.sl_atr), tpAtr: optNum(c.tp_atr), sl: optNum(c.sl_pct), tp: optNum(c.tp_pct), holdMax: optNum(c.hold_max_min)
-    } : null
+    config: c ? { qqq: optNum(c.qqq_min_return), corr: optNum(c.corr_min), zLag: optNum(c.z_lag), zDiv: optNum(c.z_divergent),
+      slAtr: optNum(c.sl_atr), tpAtr: optNum(c.tp_atr), sl: optNum(c.sl_pct), tp: optNum(c.tp_pct), holdMax: optNum(c.hold_max_min) } : null
   };
 }
-
 async function fetchLiveDataFromSupabase() {
   const { json } = await fetchJsonTimeout(SUPABASE_FUNCTION_URL, { method: 'GET', headers: authHeaders() });
   return normalizePayload(json);
 }
 
 /* =====================================================================
- *  DATA: SIMULASI (hanya jika URL Supabase belum diisi)
+ *  DATA SIMULASI (hanya saat URL belum diisi atau DEMO_MODE)
  * ===================================================================== */
 function mockLevels(price, atr) {
-  let sl = 1.5 * atr;
-  sl = clamp(sl, price * 0.0025, price * 0.02);
-  const tp = sl * (2.5 / 1.5);
-  return { stop_loss: rnd(price - sl, 2), take_profit: rnd(price + tp, 2), sl_method: 'ATR' };
+  const sl = clamp(1.5 * atr, price * 0.0025, price * 0.02);
+  return { stop_loss: rnd(price - sl, 2), take_profit: rnd(price + sl * (2.5 / 1.5), 2), sl_method: 'ATR' };
 }
-
 function mockStock(b, qqq, z) {
   const corr = clamp(b.corr + rand(-0.06, 0.06), -1, 1);
   const beta = b.beta * rand(0.9, 1.1);
@@ -579,12 +768,11 @@ function mockStock(b, qqq, z) {
   const price = b.price * (1 + rand(-0.01, 0.01));
   const atr = price * rand(0.002, 0.005);
   return Object.assign({
-    ticker: b.ticker, correlation: rnd(corr, 2), corr_samples: 48, beta: rnd(beta, 3),
-    return_15m: rnd(ret, 4), expected_return: rnd(expected, 4), lag_gap: rnd(ret - expected, 4), lag_z: rnd(z, 2),
-    resid_sigma_15m: rnd(sigma, 4), price: rnd(price, 2), volume: Math.round(rand(0.8e6, 9e6)), atr: rnd(atr, 4)
+    ticker: b.ticker, correlation: rnd(corr, 2), corr_samples: 48, beta: rnd(beta, 3), return_15m: rnd(ret, 4),
+    expected_return: rnd(expected, 4), lag_gap: rnd(ret - expected, 4), lag_z: rnd(z, 2), resid_sigma_15m: rnd(sigma, 4),
+    price: rnd(price, 2), volume: Math.round(rand(0.8e6, 9e6)), atr: rnd(atr, 4)
   }, mockLevels(price, atr));
 }
-
 function fallbackMockData() {
   const base = [
     { ticker: 'NVDA', corr: 0.88, beta: 1.8, sig: 0.28, price: 145.20 },
@@ -592,75 +780,50 @@ function fallbackMockData() {
     { ticker: 'TSM',  corr: 0.79, beta: 1.5, sig: 0.30, price: 188.30 },
     { ticker: 'SMCI', corr: 0.66, beta: 2.2, sig: 0.60, price: 41.75 },
     { ticker: 'META', corr: 0.84, beta: 1.3, sig: 0.25, price: 585.10 },
-    { ticker: 'MSFT', corr: 0.91, beta: 0.9, sig: 0.15, price: 421.60 }
+    { ticker: 'MSFT', corr: 0.91, beta: 0.9, sig: 0.15, price: 421.60 },
+    { ticker: 'AMZN', corr: 0.80, beta: 1.2, sig: 0.24, price: 196.40 }
   ];
-
   const dice = Math.random();
   let qqq;
-  if (dice < 0.70) qqq = rand(0.22, 0.60);
-  else if (dice < 0.85) qqq = rand(-0.12, 0.15);
-  else qqq = -rand(0.25, 0.55);
-
+  if (dice < 0.75) qqq = rand(0.22, 0.60); else if (dice < 0.88) qqq = rand(-0.12, 0.15); else qqq = -rand(0.25, 0.55);
   const stocks = base.map((b) => mockStock(b, qqq, Math.random() < 0.35 ? rand(-2.4, -1.0) : rand(-0.9, 1.5)));
-
-  // Pastikan ada contoh BUY LAGGING saat QQQ naik, agar UI mudah diuji
   const cfg = state.cfg;
   if (qqq > cfg.qqqThreshold && !stocks.some((s) => s.correlation >= cfg.corrThreshold && s.lag_z <= -cfg.zLag && s.lag_z > -effZDiv(cfg))) {
-    stocks[0] = mockStock(Object.assign({}, base[0], { corr: 0.9 }), qqq, -(cfg.zLag + 0.4));
+    const i = Math.floor(Math.random() * 3);
+    stocks[i] = mockStock(Object.assign({}, base[i], { corr: 0.9 }), qqq, -(cfg.zLag + 0.4));
   }
   if (Math.random() < 0.3) stocks[3].correlation = rnd(rand(-0.4, 0.2), 2);
-
   const now = new Date().toISOString();
   return normalizePayload({
-    timestamp: now,
-    generated_at: now,
-    market_open: getMarketStatus().open,
-    fresh: true,
+    timestamp: now, generated_at: now, market_open: getMarketStatus().open, fresh: true,
     benchmark: { ticker: BENCHMARK, return_15m: rnd(qqq, 2), price: rnd(512 * (1 + rand(-0.005, 0.005)), 2), volume: Math.round(rand(2e6, 6e6)) },
-    stocks,
-    skipped: [{ ticker: 'AMZN', reason: 'contoh simulasi: sampel korelasi < 20' }],
+    stocks, skipped: [],
     config: { qqq_min_return: 0.2, corr_min: 0.75, z_lag: 1, z_divergent: 3, sl_atr: 1.5, tp_atr: 2.5, sl_pct: 0.9, tp_pct: 1.5, hold_max_min: 60 }
   });
 }
 
 /* =====================================================================
- *  RIWAYAT & KINERJA SINYAL (PostgREST: tabel signal_logs)
+ *  RIWAYAT & KINERJA (PostgREST: signal_logs)
  * ===================================================================== */
 function normalizeLog(r) {
   const status = String(r.ai_status || 'PASSED').toUpperCase();
   const oc = r.outcome ? String(r.outcome).toUpperCase() : null;
   return {
-    id: r.id,
-    created_at: new Date(r.created_at),
-    ticker: String(r.ticker || '?').toUpperCase().slice(0, 10),
-    qqq_return: optNum(r.qqq_return),
-    stock_return: optNum(r.stock_return),
-    correlation: optNum(r.correlation),
-    lag_z: optNum(r.lag_z),
-    entry_price: optNum(r.entry_price),
-    stop_loss: optNum(r.stop_loss),
-    take_profit: optNum(r.take_profit),
-    ai_status: GUARD[status] ? status : 'BYPASSED',
-    ai_reason: String(r.ai_reason || ''),
-    blocked: r.blocked === true,
-    alert_sent: r.alert_sent === true,
-    outcome: OUTCOME[oc] ? oc : null,
-    return_pct: optNum(r.return_pct),
-    mfe_pct: optNum(r.mfe_pct),
-    mae_pct: optNum(r.mae_pct),
-    bars_held: optNum(r.bars_held)
+    id: r.id, created_at: new Date(r.created_at), ticker: String(r.ticker || '?').toUpperCase().slice(0, 10),
+    qqq_return: optNum(r.qqq_return), stock_return: optNum(r.stock_return), correlation: optNum(r.correlation), lag_z: optNum(r.lag_z),
+    entry_price: optNum(r.entry_price), stop_loss: optNum(r.stop_loss), take_profit: optNum(r.take_profit),
+    ai_status: GUARD[status] ? status : 'BYPASSED', ai_reason: String(r.ai_reason || ''),
+    blocked: r.blocked === true, alert_sent: r.alert_sent === true, outcome: OUTCOME[oc] ? oc : null,
+    return_pct: optNum(r.return_pct), mfe_pct: optNum(r.mfe_pct), mae_pct: optNum(r.mae_pct), bars_held: optNum(r.bars_held)
   };
 }
-
 async function fetchSignalHistory() {
   const url = SUPABASE_URL + '/rest/v1/signal_logs?select=*&order=created_at.desc&limit=' + HISTORY_LIMIT;
-  const headers = Object.assign(authHeaders(), { 'Prefer': 'count=exact' });
-  const { res, json } = await fetchJsonTimeout(url, { method: 'GET', headers });
+  const { res, json } = await fetchJsonTimeout(url, { method: 'GET', headers: Object.assign(authHeaders(), { 'Prefer': 'count=exact' }) });
   if (!Array.isArray(json)) throw new Error('Respons riwayat bukan array');
   const m = /\/(\d+)$/.exec(res.headers.get('content-range') || '');
   return { rows: json.map(normalizeLog), total: m ? parseInt(m[1], 10) : json.length };
 }
-
 async function fetchPerformance() {
   const cols = 'ticker,ai_status,blocked,alert_sent,outcome,return_pct,mfe_pct,mae_pct,bars_held,created_at';
   const url = SUPABASE_URL + '/rest/v1/signal_logs?select=' + cols + '&outcome=in.(TP,SL,TIMEOUT)&order=created_at.desc&limit=' + PERF_LIMIT;
@@ -668,7 +831,6 @@ async function fetchPerformance() {
   if (!Array.isArray(json)) throw new Error('Respons kinerja bukan array');
   return json.map(normalizeLog).filter((r) => isNum(r.return_pct));
 }
-
 function mockHistory() {
   const now = Date.now();
   const mk = (minAgo, tk, q, s, z, entry, st, why, oc, ret) => normalizeLog({
@@ -677,43 +839,488 @@ function mockHistory() {
     blocked: st === 'REJECTED', alert_sent: st !== 'REJECTED', outcome: oc, return_pct: ret,
     mfe_pct: oc === 'OPEN' ? 0.21 : Math.max(ret, 0) + 0.1, mae_pct: oc === 'OPEN' ? -0.12 : Math.min(ret, 0) - 0.1, bars_held: 5
   });
-  return {
-    rows: [
-      mk(12, 'NVDA', 0.31, 0.10, -1.6, 145.2, 'PASSED', 'Tidak ada berita buruk', 'OPEN', null),
-      mk(47, 'META', 0.28, 0.06, -1.3, 585.1, 'REJECTED', 'Investigasi regulator terhadap penjualan', 'SL', -0.45),
-      mk(95, 'AMD', 0.35, 0.02, -2.1, 162.45, 'NO_NEWS', 'Tidak ada berita 24 jam terakhir', 'TP', 0.75),
-      mk(140, 'TSM', 0.26, 0.0, -1.2, 188.3, 'BYPASSED', 'Guardrail gagal: timeout', 'TIMEOUT', 0.18)
-    ],
-    total: 4
-  };
+  return { rows: [
+    mk(12, 'NVDA', 0.31, 0.10, -1.6, 145.2, 'PASSED', 'Tidak ada berita buruk', 'OPEN', null),
+    mk(47, 'META', 0.28, 0.06, -1.3, 585.1, 'REJECTED', 'Investigasi regulator terhadap penjualan', 'SL', -0.45),
+    mk(95, 'AMD', 0.35, 0.02, -2.1, 162.45, 'NO_NEWS', 'Tidak ada berita 24 jam terakhir', 'TP', 0.75),
+    mk(140, 'TSM', 0.26, 0.0, -1.2, 188.3, 'BYPASSED', 'Guardrail gagal: timeout', 'TIMEOUT', 0.18),
+    mk(210, 'AMZN', 0.24, -0.05, -1.5, 196.4, 'PASSED', 'Tidak ada berita buruk', 'TP', 0.62)
+  ], total: 5 };
 }
-
 function mockPerformance() {
-  const tickers = ['NVDA', 'AMD', 'TSM', 'META', 'MSFT', 'SMCI'];
+  const tickers = ['NVDA', 'AMD', 'TSM', 'META', 'MSFT', 'AMZN', 'SMCI'];
   const statuses = ['PASSED', 'PASSED', 'PASSED', 'NO_NEWS', 'BYPASSED', 'REJECTED'];
   const rows = [];
-  for (let i = 0; i < 24; i++) {
+  for (let i = 0; i < 26; i++) {
     const st = statuses[Math.floor(Math.random() * statuses.length)];
     const d = Math.random();
-    const oc = d < 0.42 ? 'TP' : (d < 0.78 ? 'SL' : 'TIMEOUT');
+    const oc = d < 0.44 ? 'TP' : (d < 0.78 ? 'SL' : 'TIMEOUT');
     const ret = oc === 'TP' ? rand(0.5, 1.0) : (oc === 'SL' ? -rand(0.3, 0.6) : rand(-0.3, 0.4));
-    rows.push(normalizeLog({
-      ticker: tickers[i % tickers.length], ai_status: st, blocked: st === 'REJECTED', alert_sent: st !== 'REJECTED',
+    rows.push(normalizeLog({ ticker: tickers[i % tickers.length], ai_status: st, blocked: st === 'REJECTED', alert_sent: st !== 'REJECTED',
       outcome: oc, return_pct: rnd(ret, 3), mfe_pct: rnd(Math.max(ret, 0) + rand(0, 0.3), 3), mae_pct: rnd(Math.min(ret, 0) - rand(0, 0.3), 3),
-      bars_held: Math.round(rand(1, 12)), created_at: new Date(Date.now() - i * 3600000).toISOString()
-    }));
+      bars_held: Math.round(rand(1, 12)), created_at: new Date(Date.now() - i * 3600000).toISOString() }));
   }
   return rows;
 }
 
 /* =====================================================================
- *  STATISTIK KINERJA
+ *  ALERT, TOAST, SUARA
+ * ===================================================================== */
+function showAlert(msg, type = 'danger') {
+  $('alertBox').innerHTML = '<div class="hud-alert ' + type + '" role="alert"><span>' + escapeHtml(msg) + '</span>' +
+    '<button type="button" aria-label="Tutup" onclick="this.parentNode.remove()">×</button></div>';
+}
+function clearAlert() { $('alertBox').innerHTML = ''; }
+let toastTimer = null;
+function showToast(title, text) {
+  const t = $('toast');
+  t.innerHTML = '<b>' + escapeHtml(title) + '</b><span>' + escapeHtml(text) + '</span>';
+  t.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('on'), 3200);
+}
+let audioCtx = null;
+function beep(test = false) {
+  if (!$('sfx').checked) return;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    audioCtx = audioCtx || new AC();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const t0 = audioCtx.currentTime;
+    (test ? [880] : [880, 1320, 1760]).forEach((f, i) => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain(), s = t0 + i * 0.11;
+      o.type = 'sine'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, s);
+      g.gain.exponentialRampToValueAtTime(0.12, s + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, s + 0.1);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(s); o.stop(s + 0.12);
+    });
+  } catch (e) { /* abaikan */ }
+}
+
+/* =====================================================================
+ *  REFRESH
+ * ===================================================================== */
+function setLoading(on) {
+  state.loading = on;
+  $('btnRefresh').disabled = on;
+  $('btnLabel').textContent = on ? 'Memindai…' : 'Refresh';
+}
+// Data simulasi HANYA dipakai saat URL belum diisi atau DEMO_MODE. Jika refresh live gagal, dashboard
+// tetap menampilkan snapshot live terakhir dengan tanda GAGAL, atau kosong jika belum pernah berhasil.
+async function refreshSnapshot() {
+  if (!isUrlConfigured()) {
+    state.data = fallbackMockData(); state.mode = 'simulation'; state.liveError = null;
+    showAlert(DEMO_MODE ? 'Mode DEMO: data di bawah adalah simulasi acak, bukan data pasar.' : 'URL Supabase belum diisi. Menampilkan data SIMULASI agar tampilan dapat diuji.', 'info');
+    return true;
+  }
+  try {
+    state.data = await fetchLiveDataFromSupabase(); state.mode = 'live'; state.liveError = null; clearAlert();
+    return true;
+  } catch (e) {
+    state.liveError = e.message;
+    if (state.mode === 'live' && state.data) {
+      showAlert('Gagal refresh data live (' + e.message + '). Yang tampil adalah snapshot terakhir dari ' + fmtWibTime(new Date(state.data.generated_at)) + ' WIB, jangan dipakai sebagai sinyal terkini.');
+    } else {
+      state.data = null; state.mode = 'none';
+      showAlert('Gagal mengambil data live (' + e.message + '). Belum ada data yang bisa ditampilkan.');
+    }
+    return false;
+  }
+}
+async function refreshHistory() {
+  if (!isDbConfigured()) {
+    const m = mockHistory();
+    state.history = { rows: m.rows, total: m.total, mode: 'simulation', error: null };
+    state.perf = { rows: mockPerformance(), mode: 'simulation', error: null };
+    return;
+  }
+  const [h, p] = await Promise.allSettled([fetchSignalHistory(), fetchPerformance()]);
+  state.history = h.status === 'fulfilled' ? { rows: h.value.rows, total: h.value.total, mode: 'live', error: null } : { rows: [], total: null, mode: 'live', error: h.reason.message };
+  state.perf = p.status === 'fulfilled' ? { rows: p.value, mode: 'live', error: null } : { rows: [], mode: 'live', error: p.reason.message };
+}
+async function refreshData() {
+  if (state.loading) return;
+  setLoading(true);
+  try {
+    const [fresh] = await Promise.all([refreshSnapshot(), refreshHistory()]);
+    state.lastRefreshAt = Date.now();
+    renderAll();
+    if (fresh && state.data) {
+      if (state.booting) state.pendingAcquire = true; else detectAcquisitions();
+    }
+  } finally {
+    setLoading(false);
+  }
+}
+
+// Sinyal BUY yang baru muncul sejak refresh sebelumnya -> animasi TARGET ACQUIRED + toast (+ suara jika aktif)
+function detectAcquisitions() {
+  const rows = state.rows;
+  const prev = state.prevSignals || {};
+  const newly = rows.filter((r) => r.signal === 'BUY_LAGGING' && prev[r.ticker] !== 'BUY_LAGGING');
+  state.prevSignals = Object.fromEntries(rows.map((r) => [r.ticker, r.signal]));
+  if (!newly.length) return;
+  const now = performance.now();
+  newly.forEach((r) => { state.acquire[r.ticker] = now; });
+  showToast('TARGET ACQUIRED', newly.map((r) => r.ticker + ' · z ' + fmtSigned(r.lag_z)).join('   '));
+  beep();
+  if (REDUCED && network) network.redraw();
+}
+
+/* =====================================================================
+ *  STATUS BAR
+ * ===================================================================== */
+function setPill(id, cls, text) { const p = $(id); p.className = 'pill ' + cls; p.lastElementChild.textContent = text; }
+function updateStatusBar() {
+  const now = new Date();
+  const market = getMarketStatus(now);
+  $('clkNy').textContent = market.nyTime;
+  $('clkWib').textContent = fmtWibTime(now);
+  setPill('pillMarket', market.open ? 'ok' : 'dim', market.open ? 'Pasar buka' : 'Pasar tutup');
+  if (!state.data) {
+    setPill('pillLive', state.mode === 'none' ? 'bad' : 'dim', state.mode === 'none' ? 'Tidak ada data' : 'Memuat');
+    setPill('pillAge', 'dim', 'DATA -');
+    return;
+  }
+  const gen = new Date(state.data.generated_at);
+  const ageMs = now.getTime() - gen.getTime();
+  const ageSec = Math.max(0, Math.round(ageMs / 1000));
+  const ageTxt = ageSec < 60 ? ageSec + 'S' : ageSec < 3600 ? Math.round(ageSec / 60) + 'M' : Math.round(ageSec / 3600) + 'J';
+  if (state.mode === 'live') {
+    const stale = market.open && (ageMs > STALE_AFTER_MS || state.data.fresh === false);
+    if (state.liveError) setPill('pillLive', 'bad', 'Gagal refresh');
+    else if (stale) setPill('pillLive', 'bad', 'Data basi');
+    else setPill('pillLive', 'ok', 'Live');
+  } else {
+    setPill('pillLive', 'sim', DEMO_MODE ? 'Demo' : 'Simulasi');
+  }
+  setPill('pillAge', 'dim', 'DATA ' + ageTxt + ' · BAR ' + fmtWibTime(new Date(state.data.timestamp), false));
+}
+
+/* =====================================================================
+ *  RADAR (vis-network + lapisan kanvas)
+ * ===================================================================== */
+const RADAR_BASE = 80, RADAR_SPAN = 420, RADAR_MIN_ABS_R = 0.3;
+const radiusFor = (absR) => RADAR_BASE + (1 - clamp(absR, RADAR_MIN_ABS_R, 1)) * RADAR_SPAN;
+const RING_LEVELS = [0.9, 0.8, 0.7, 0.6, 0.5, 0.4];
+
+function initNetwork() {
+  nodesDS = new vis.DataSet();
+  edgesDS = new vis.DataSet();
+  network = new vis.Network($('graph'), { nodes: nodesDS, edges: edgesDS }, {
+    physics: false,
+    interaction: { hover: !COARSE, dragNodes: false, zoomView: !COARSE, dragView: !COARSE, tooltipDelay: 60, selectConnectedEdges: false },
+    nodes: { shape: 'dot' },
+    edges: { smooth: false, selectionWidth: 0, hoverWidth: 0 }
+  });
+  network.on('click', (params) => { if (params.nodes.length && params.nodes[0] !== BENCHMARK) selectTicker(params.nodes[0]); });
+  network.on('zoom', () => { userMovedView = true; });
+  network.on('dragEnd', (p) => { if (!p.nodes.length) userMovedView = true; });
+  network.on('beforeDrawing', drawRadarBackground);
+  network.on('afterDrawing', drawRadarOverlay);
+  window.addEventListener('resize', () => { if (state.data && !userMovedView) renderGraph(state.rows); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => network.redraw());
+  if (!REDUCED) startRadarLoop();
+}
+
+let lastFrame = 0;
+function startRadarLoop() {
+  const loop = (ts) => {
+    requestAnimationFrame(loop);
+    if (document.hidden || ts - lastFrame < 33) return;   // ~30 fps, berhenti saat tab tersembunyi
+    lastFrame = ts;
+    if (network) network.redraw();
+  };
+  requestAnimationFrame(loop);
+}
+
+// Skala agar semua node + cincin ambang muat. Ukuran node, huruf, dan garis overlay dibagi skala ini
+// sehingga tampil konstan dalam piksel, tidak mengecil saat ada saham berkorelasi rendah yang jauh dari inti.
+function radarScale(rows) {
+  const el = $('graph');
+  const w = el.clientWidth || 600, h = el.clientHeight || 400;
+  const radii = rows.map((s) => radiusFor(Math.abs(s.correlation)));
+  const maxR = Math.max(radiusFor(state.cfg.corrThreshold), ...radii, 160);
+  const pad = 44;   // ruang piksel untuk label di tepi
+  return Math.max(0.05, (Math.min(w, h) / 2 - pad) / maxR);
+}
+function fitRadar() {
+  if (!network || userMovedView) return;
+  network.moveTo({ position: { x: 0, y: 0 }, scale: radarScale(state.rows), animation: false });
+}
+
+function drawRadarBackground(ctx) {
+  const t = performance.now() / 1000;
+  const k = 1 / network.getScale();          // 1 piksel layar dalam satuan kanvas
+  const outer = radiusFor(RADAR_MIN_ABS_R) + 14 * k;
+  ctx.save();
+  // garis silang & cincin korelasi
+  ctx.strokeStyle = 'rgba(63,224,255,0.08)'; ctx.lineWidth = k;
+  ctx.beginPath(); ctx.moveTo(-outer, 0); ctx.lineTo(outer, 0); ctx.moveTo(0, -outer); ctx.lineTo(0, outer); ctx.stroke();
+  ctx.font = (10.5 * k).toFixed(2) + 'px ' + CANVAS_MONO; ctx.textBaseline = 'middle';
+  RING_LEVELS.forEach((r) => {
+    const R = radiusFor(r);
+    ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(63,224,255,0.16)'; ctx.stroke();
+    ctx.fillStyle = 'rgba(111,147,166,0.85)';
+    ctx.fillText('r ' + r.toFixed(1), R * Math.cos(-0.62) + 5 * k, R * Math.sin(-0.62));
+  });
+  // cincin ambang korelasi (emas putus-putus)
+  const thR = radiusFor(state.cfg.corrThreshold);
+  ctx.setLineDash([6 * k, 6 * k]); ctx.lineWidth = 1.5 * k; ctx.strokeStyle = 'rgba(232,193,112,0.65)';
+  ctx.beginPath(); ctx.arc(0, 0, thR, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = COLORS.gold; ctx.textAlign = 'center';
+  ctx.fillText('AMBANG r ≥ ' + state.cfg.corrThreshold.toFixed(2), 0, thR + 12 * k); ctx.textAlign = 'start';
+  // tanda derajat di tepi luar
+  ctx.strokeStyle = 'rgba(63,224,255,0.35)';
+  for (let i = 0; i < 72; i++) {
+    const a = i / 72 * Math.PI * 2, len = (i % 6 === 0 ? 10 : 4) * k;
+    ctx.beginPath(); ctx.moveTo(Math.cos(a) * outer, Math.sin(a) * outer); ctx.lineTo(Math.cos(a) * (outer - len), Math.sin(a) * (outer - len)); ctx.stroke();
+  }
+  ctx.beginPath(); ctx.arc(0, 0, outer, 0, Math.PI * 2); ctx.strokeStyle = 'rgba(63,224,255,0.25)'; ctx.lineWidth = k; ctx.stroke();
+  // sapuan radar
+  if (!REDUCED) {
+    const ang = (t * 0.7) % (Math.PI * 2), step = 0.03;
+    for (let k = 0; k < 26; k++) {
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, outer, ang - (k + 1) * step, ang - k * step); ctx.closePath();
+      ctx.fillStyle = 'rgba(63,224,255,' + (0.16 * (1 - k / 26)).toFixed(3) + ')'; ctx.fill();
+    }
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(ang) * outer, Math.sin(ang) * outer);
+    ctx.strokeStyle = 'rgba(63,224,255,0.55)'; ctx.lineWidth = 1.5 * k; ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawBrackets(ctx, x, y, half, len, color, lw) {
+  ctx.strokeStyle = color; ctx.lineWidth = lw;
+  [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([sx, sy]) => {
+    const cx = x + sx * half, cy = y + sy * half;
+    ctx.beginPath(); ctx.moveTo(cx, cy - sy * len); ctx.lineTo(cx, cy); ctx.lineTo(cx - sx * len, cy); ctx.stroke();
+  });
+}
+
+function drawRadarOverlay(ctx) {
+  const now = performance.now(), t = now / 1000;
+  const k = 1 / network.getScale();
+  ctx.save();
+  // cincin bersegmen di sekitar inti QQQ
+  const rot = REDUCED ? 0 : t * 0.9;
+  ctx.lineWidth = 2.5 * k; ctx.strokeStyle = 'rgba(63,224,255,0.85)';
+  for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.arc(0, 0, 30 * k, rot + i * Math.PI / 3, rot + i * Math.PI / 3 + 0.7); ctx.stroke(); }
+  ctx.lineWidth = 1.5 * k; ctx.strokeStyle = 'rgba(232,193,112,0.85)';
+  for (let i = 0; i < 12; i++) { ctx.beginPath(); ctx.arc(0, 0, 38 * k, -rot * 0.6 + i * Math.PI / 6, -rot * 0.6 + i * Math.PI / 6 + 0.18); ctx.stroke(); }
+  // denyut node BUY
+  state.rows.forEach((s) => {
+    if (s.signal !== 'BUY_LAGGING') return;
+    const p = state.positions[s.ticker]; if (!p) return;
+    const ph = REDUCED ? 0.4 : (t % 1.6) / 1.6;
+    ctx.beginPath(); ctx.arc(p.x, p.y, (14 + ph * 22) * k, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,182,39,' + (0.85 * (1 - ph)).toFixed(3) + ')'; ctx.lineWidth = 2 * k; ctx.stroke();
+  });
+  // TARGET ACQUIRED (1,8 detik setelah BUY baru muncul)
+  Object.keys(state.acquire).forEach((tk) => {
+    const age = now - state.acquire[tk];
+    const p = state.positions[tk];
+    if (age > 1800 || !p) { if (age > 1800) delete state.acquire[tk]; return; }
+    const q = age / 1800;
+    const half = (20 + (1 - Math.min(1, q * 2.5)) * 36) * k;
+    drawBrackets(ctx, p.x, p.y, half, 9 * k, 'rgba(255,182,39,' + (1 - q * 0.6).toFixed(3) + ')', 2.5 * k);
+    if (Math.floor(age / 140) % 2 === 0 || q > 0.5) {
+      ctx.font = '700 ' + (12 * k).toFixed(2) + 'px ' + CANVAS_FONT; ctx.textAlign = 'center'; ctx.fillStyle = COLORS.buy;
+      ctx.fillText('TARGET ACQUIRED', p.x, p.y - half - 10 * k); ctx.textAlign = 'start';
+    }
+  });
+  // kunci target pada node terpilih
+  const sp = state.selected && state.positions[state.selected];
+  if (sp) {
+    const e = REDUCED ? 1 : Math.min(1, (now - state.lockStart) / 420);
+    const ease = 1 - Math.pow(1 - e, 3);
+    const half = (18 + (1 - ease) * 30) * k;
+    drawBrackets(ctx, sp.x, sp.y, half, 8 * k, COLORS.gold, 2 * k);
+    ctx.beginPath(); ctx.setLineDash([3 * k, 5 * k]); ctx.arc(sp.x, sp.y, half + 7 * k, rot, rot + Math.PI * 2);
+    ctx.strokeStyle = 'rgba(232,193,112,0.45)'; ctx.lineWidth = k; ctx.stroke(); ctx.setLineDash([]);
+  }
+  ctx.restore();
+}
+
+function tipEl(title, lines) {
+  const d = document.createElement('div');
+  const h = document.createElement('div'); h.className = 'tip-t'; h.textContent = title; d.appendChild(h);
+  lines.forEach((l) => { const x = document.createElement('div'); x.textContent = l; d.appendChild(x); });
+  return d;
+}
+
+function renderGraph(rows) {
+  const bench = state.data.benchmark;
+  const n = rows.length;
+  const nodes = [], edges = [];
+  state.positions = {};
+  const k = 1 / (userMovedView ? network.getScale() : radarScale(rows));
+  nodes.push({
+    id: BENCHMARK, label: bench.ticker + '\n' + fmtPct(bench.return_15m), x: 0, y: 0, fixed: true, size: 17 * k,
+    title: tipEl(bench.ticker + ' · BENCHMARK', ['Return 15m ' + fmtPct(bench.return_15m), 'Harga ' + fmtPrice(bench.price)]),
+    color: { background: '#7eecff', border: '#e6fbff', highlight: { background: '#7eecff', border: '#fff' }, hover: { background: '#7eecff', border: '#fff' } },
+    borderWidth: 2, shadow: { enabled: true, color: 'rgba(63,224,255,0.9)', size: 30, x: 0, y: 0 },
+    font: { color: COLORS.gold, size: 14 * k, face: CANVAS_FONT, strokeWidth: 4 * k, strokeColor: COLORS.bg, vadjust: 24 * k }
+  });
+  rows.forEach((s, i) => {
+    const meta = SIGNALS[s.signal];
+    const angle = (2 * Math.PI * i) / Math.max(n, 1) - Math.PI / 2;
+    const absR = Math.abs(s.correlation);
+    const R = radiusFor(absR);
+    const x = Math.cos(angle) * R, y = Math.sin(angle) * R;
+    const isBuy = s.signal === 'BUY_LAGGING';
+    state.positions[s.ticker] = { x, y };
+    nodes.push({
+      id: s.ticker, label: s.ticker + '\n' + fmtPct(s.return_15m), x, y, fixed: true, size: (isBuy ? 10 : 7.5) * k,
+      title: tipEl(s.ticker + ' · ' + meta.label, ['r ' + s.correlation.toFixed(2) + '   β ' + fmtNum(s.beta), 'Ret 15m ' + fmtPct(s.return_15m) + '  (eksp ' + fmtPct(s.expected_return) + ')', 'Lag z ' + fmtSigned(s.lag_z)]),
+      color: { background: meta.color, border: 'rgba(255,255,255,0.75)', highlight: { background: meta.color, border: '#fff' }, hover: { background: meta.color, border: '#fff' } },
+      borderWidth: isBuy ? 2.5 : 1.5,
+      shadow: { enabled: true, color: meta.color, size: isBuy ? 26 : 12, x: 0, y: 0 },
+      font: { color: COLORS.text, size: 12.5 * k, face: CANVAS_FONT, strokeWidth: 4 * k, strokeColor: COLORS.bg, vadjust: 2 * k }
+    });
+    edges.push({
+      id: 'e-' + s.ticker, from: BENCHMARK, to: s.ticker, width: (0.8 + absR * 2.6) * k, dashes: s.correlation < 0 ? [5 * k, 6 * k] : false,
+      color: { color: meta.color, highlight: meta.color, hover: meta.color, opacity: s.signal === 'NEUTRAL' ? 0.35 : 0.7 }
+    });
+  });
+  nodesDS.clear(); edgesDS.clear(); nodesDS.add(nodes); edgesDS.add(edges);
+  fitRadar();
+  if (REDUCED) network.redraw();
+}
+
+/* =====================================================================
+ *  PAPAN SINYAL
+ * ===================================================================== */
+function levelsOf(s) {
+  const cfg = state.data && state.data.config;
+  const slPct = cfg && isNum(cfg.sl) ? cfg.sl : DEFAULT_SL_PCT;
+  const tpPct = cfg && isNum(cfg.tp) ? cfg.tp : DEFAULT_TP_PCT;
+  if (!isNum(s.price)) return null;
+  return { sl: isNum(s.stop_loss) ? s.stop_loss : s.price * (1 - slPct / 100), tp: isNum(s.take_profit) ? s.take_profit : s.price * (1 + tpPct / 100) };
+}
+function flashCls(tk, key, v) {
+  const prev = state.prevVals[tk] && state.prevVals[tk][key];
+  return (prev !== undefined && prev !== v) ? ' flash' : '';
+}
+function renderSignals(rows) {
+  const counts = { BUY_LAGGING: 0, MOMENTUM: 0, DIVERGENT: 0, AVOID: 0, NEUTRAL: 0 };
+  rows.forEach((s) => counts[s.signal]++);
+  const sel = state.selected;
+  $('signalBody').innerHTML = rows.map((s) => {
+    const meta = SIGNALS[s.signal], lv = levelsOf(s), isBuy = s.signal === 'BUY_LAGGING';
+    const cls = ['click', isBuy ? 'buy' : '', sel === s.ticker ? 'sel' : ''].join(' ');
+    return '<tr class="' + cls + '" data-ticker="' + escapeHtml(s.ticker) + '">' +
+      '<td class="tk">' + escapeHtml(s.ticker) + '</td>' +
+      '<td class="r' + flashCls(s.ticker, 'price', s.price) + '">' + fmtPrice(s.price) + '</td>' +
+      '<td class="r">' + s.correlation.toFixed(2) + '</td>' +
+      '<td class="r">' + fmtNum(s.beta) + '</td>' +
+      '<td class="r ' + pctClass(s.return_15m) + flashCls(s.ticker, 'ret', s.return_15m) + '">' + fmtPct(s.return_15m) + '</td>' +
+      '<td class="r muted">' + fmtPct(s.expected_return) + '</td>' +
+      '<td class="r ' + zClass(s.lag_z, state.cfg) + '">' + fmtSigned(s.lag_z) + '</td>' +
+      '<td class="r muted">' + fmtVolume(s.volume) + '</td>' +
+      '<td><span class="badge b-' + s.signal + '">' + meta.label + '</span></td>' +
+      '<td class="r">' + (isBuy && lv ? '<span class="neg">' + lv.sl.toFixed(2) + '</span> / <span class="pos">' + lv.tp.toFixed(2) + '</span>' : '<span class="muted">-</span>') + '</td></tr>';
+  }).join('') || '<tr class="empty-row"><td colspan="10">Tidak ada saham yang lolos perhitungan pada snapshot ini.</td></tr>';
+
+  $('signalCards').innerHTML = rows.map((s) => {
+    const meta = SIGNALS[s.signal], lv = levelsOf(s), isBuy = s.signal === 'BUY_LAGGING';
+    return '<button type="button" class="card' + (isBuy ? ' buy' : '') + (sel === s.ticker ? ' sel' : '') + '" data-ticker="' + escapeHtml(s.ticker) + '">' +
+      '<div class="card-top"><b>' + escapeHtml(s.ticker) + '</b><span class="badge b-' + s.signal + '">' + meta.label + '</span></div>' +
+      '<div class="card-grid">' +
+        '<span>Harga<b class="' + flashCls(s.ticker, 'price', s.price).trim() + '">' + fmtPrice(s.price) + '</b></span>' +
+        '<span>Ret 15m<b class="' + pctClass(s.return_15m) + '">' + fmtPct(s.return_15m) + '</b></span>' +
+        '<span>Lag z<b class="' + zClass(s.lag_z, state.cfg) + '">' + fmtSigned(s.lag_z) + '</b></span>' +
+        '<span>Ekspektasi<b>' + fmtPct(s.expected_return) + '</b></span>' +
+        '<span>r / <span class="nc">β</span><b>' + s.correlation.toFixed(2) + ' / ' + fmtNum(s.beta) + '</b></span>' +
+        '<span>SL / TP<b>' + (isBuy && lv ? lv.sl.toFixed(2) + ' / ' + lv.tp.toFixed(2) : '-') + '</b></span>' +
+      '</div></button>';
+  }).join('') || '<div class="muted">Tidak ada saham yang lolos perhitungan pada snapshot ini.</div>';
+
+  $('signalSummary').innerHTML = Object.keys(counts).map((k) => '<span class="badge b-g b-' + k + '">' + SIGNALS[k].short + ' ' + counts[k] + '</span>').join('');
+  const sk = state.data.skipped;
+  $('skippedNote').innerHTML = sk.length ? 'Dilewati: ' + sk.map((x) => '<b>' + escapeHtml(x.ticker) + '</b> (' + escapeHtml(x.reason) + ')').join(', ') : '';
+  const c = state.data.config, v = (x) => (x === null || x === undefined ? '-' : x);
+  $('serverCfg').textContent = c ? 'SERVER › QQQ > +' + v(c.qqq) + '% · r ≥ ' + v(c.corr) + ' · BUY jika −' + v(c.zDiv) + ' < z ≤ −' + v(c.zLag) +
+    ' · SL ' + v(c.slAtr) + '×ATR / TP ' + v(c.tpAtr) + '×ATR · batas waktu ' + v(c.holdMax) + ' mnt' : '';
+
+  state.prevVals = Object.fromEntries(rows.map((s) => [s.ticker, { price: s.price, ret: s.return_15m }]));
+}
+
+/* =====================================================================
+ *  TARGET LOCK
+ * ===================================================================== */
+function renderLock(rows, animate) {
+  const panel = $('detailPanel');
+  const s = rows.find((r) => r.ticker === state.selected);
+  if (!s) { panel.innerHTML = '<p class="lock-empty">Pilih node di radar atau saham di papan sinyal.</p>'; return; }
+  const meta = SIGNALS[s.signal], bench = state.data.benchmark, cfg = state.cfg;
+  const ZMIN = -5, ZMAX = 3, zd = effZDiv(cfg);
+  const pos = (z) => (clamp(z, ZMIN, ZMAX) - ZMIN) / (ZMAX - ZMIN) * 100;
+  const pD = pos(-zd), pB = pos(-cfg.zLag);
+  const ticks = [-4, -3, -2, -1, 0, 1, 2].map((v) => '<span class="tick" style="left:' + pos(v) + '%">' + v + '</span>').join('');
+  const zMark = isNum(s.lag_z) ? '<div class="zmark" style="left:' + pos(s.lag_z) + '%"><span>z ' + fmtSigned(s.lag_z) + '</span></div>' : '';
+  const qqqOk = bench.return_15m > cfg.qqqThreshold && s.correlation >= cfg.corrThreshold;
+  const lv = levelsOf(s);
+  let ladder = '';
+  if (lv) {
+    const span = lv.tp - lv.sl || 1;
+    const ePos = clamp((lv.tp - s.price) / span * 100, 0, 100);
+    const slPct = (lv.sl / s.price - 1) * 100, tpPct = (lv.tp / s.price - 1) * 100;
+    ladder =
+      '<div class="lock-levels">' +
+        '<div class="ladder"><div class="ladder-track"></div>' +
+          '<div class="rung tp" style="top:0%"><em>TP</em>' + lv.tp.toFixed(2) + '</div>' +
+          '<div class="rung en" style="top:' + ePos + '%"><em>IN</em>' + s.price.toFixed(2) + '</div>' +
+          '<div class="rung sl" style="top:100%"><em>SL</em>' + lv.sl.toFixed(2) + '</div>' +
+        '</div>' +
+        '<div class="levels-info">' +
+          '<div class="stat"><span class="label">Take-profit</span><b class="pos">' + fmtPct(tpPct) + '</b></div>' +
+          '<div class="stat"><span class="label">Stop-loss</span><b class="neg">' + fmtPct(slPct) + '</b></div>' +
+          '<div class="stat"><span class="label">Rasio R:R</span><b>1 : ' + (tpPct / Math.abs(slPct)).toFixed(1) + '</b></div>' +
+          '<div class="stat"><span class="label">ATR 5m</span><b>' + fmtNum(s.atr) + '</b><small>' + (s.sl_method === 'ATR' ? 'basis ATR' : s.sl_method === 'PCT' ? 'basis persen' : '') + '</small></div>' +
+        '</div>' +
+      '</div>';
+  }
+  panel.innerHTML =
+    '<div class="' + (animate ? 'lock-anim' : '') + '" style="display:grid;gap:14px">' +
+      '<div class="lock-head"><div><div class="lock-ticker">' + escapeHtml(s.ticker) + '</div>' +
+        '<div class="lock-sub">' + fmtPrice(s.price) + ' · VOL 15M ' + fmtVolume(s.volume) + '</div></div>' +
+        '<span class="badge b-' + s.signal + '">' + meta.label + '</span></div>' +
+      '<div><div class="label">Lag z <span class="nc">(disesuaikan β)</span></div>' +
+        '<div class="zgauge">' +
+          '<div class="zone z-d" style="left:0;width:' + pD + '%"></div>' +
+          '<div class="zone z-b" style="left:' + pD + '%;width:' + (pB - pD) + '%"></div>' +
+          '<div class="zone z-m" style="left:' + pB + '%;right:0"></div>' + ticks + zMark +
+        '</div>' +
+        '<div class="zlegend"><span style="left:' + (pD / 2) + '%;color:var(--div)">DIVERGENT</span><span style="left:' + ((pD + pB) / 2) + '%;color:var(--buy)">BUY</span>' +
+          '<span style="left:' + ((pB + 100) / 2) + '%;color:var(--mom)">MOMENTUM</span></div>' +
+        (qqqOk ? '' : '<div class="znote">Zona z hanya berlaku saat QQQ naik &gt; +' + cfg.qqqThreshold.toFixed(2) + '% dan r ≥ ' + cfg.corrThreshold.toFixed(2) + '.</div>') +
+      '</div>' +
+      '<div class="statgrid">' +
+        '<div class="stat"><span class="label">Korelasi r</span><b>' + s.correlation.toFixed(3) + '</b><small>' + (isNum(s.corr_samples) ? 'n=' + s.corr_samples : '') + '</small></div>' +
+        '<div class="stat"><span class="label">Beta <span class="nc">β</span></span><b>' + fmtNum(s.beta) + '</b></div>' +
+        '<div class="stat"><span class="label"><span class="nc">σ</span> 15m</span><b>' + (isNum(s.resid_sigma_15m) ? s.resid_sigma_15m.toFixed(2) + '%' : '-') + '</b></div>' +
+        '<div class="stat"><span class="label">Ret 15m</span><b class="' + pctClass(s.return_15m) + '">' + fmtPct(s.return_15m) + '</b></div>' +
+        '<div class="stat"><span class="label">Ekspektasi</span><b class="' + pctClass(s.expected_return) + '">' + fmtPct(s.expected_return) + '</b><small><span class="nc">β</span> × QQQ ' + fmtPct(bench.return_15m) + '</small></div>' +
+        '<div class="stat"><span class="label">Selisih</span><b class="' + pctClass(s.lag_gap) + '">' + fmtPct(s.lag_gap) + '</b></div>' +
+      '</div>' +
+      ladder +
+      '<p class="explain">' + escapeHtml(explainSignal(s, bench, cfg, s.signal)) + '</p>' +
+      (s.signal === 'BUY_LAGGING' ? '<div class="explain-note">Level SL/TP hanya ilustrasi, bukan rekomendasi.</div>' : '') +
+    '</div>';
+}
+
+/* =====================================================================
+ *  KINERJA
  * ===================================================================== */
 function aggregate(rows) {
   const n = rows.length;
   if (!n) return null;
-  let wins = 0, sum = 0, gp = 0, gl = 0, tp = 0, sl = 0, to = 0;
-  let mfe = 0, mfeN = 0, mae = 0, maeN = 0, bars = 0, barsN = 0;
+  let wins = 0, sum = 0, gp = 0, gl = 0, tp = 0, sl = 0, to = 0, mfe = 0, mfeN = 0, mae = 0, maeN = 0, bars = 0, barsN = 0;
   rows.forEach((r) => {
     const x = r.return_pct;
     sum += x;
@@ -723,421 +1330,103 @@ function aggregate(rows) {
     if (isNum(r.mae_pct)) { mae += r.mae_pct; maeN++; }
     if (isNum(r.bars_held)) { bars += r.bars_held; barsN++; }
   });
-  return {
-    n, win: wins / n * 100, avg: sum / n, total: sum,
-    pf: gl > 0 ? gp / gl : (gp > 0 ? Infinity : null),
-    tp, sl, to,
-    mfe: mfeN ? mfe / mfeN : null, mae: maeN ? mae / maeN : null,
-    mins: barsN ? bars / barsN * 5 : null
-  };
+  return { n, win: wins / n * 100, avg: sum / n, total: sum, pf: gl > 0 ? gp / gl : (gp > 0 ? Infinity : null), tp, sl, to,
+    mfe: mfeN ? mfe / mfeN : null, mae: maeN ? mae / maeN : null, mins: barsN ? bars / barsN * 5 : null };
 }
-
-function perfRow(label, a, extraCls = '') {
-  if (!a) return '<tr class="' + extraCls + '"><td>' + label + '</td><td class="text-end text-muted-dss">0</td><td colspan="4" class="text-muted-dss">-</td></tr>';
-  return '<tr class="' + extraCls + '"><td>' + label + '</td>' +
-    '<td class="text-end">' + a.n + '</td>' +
-    '<td class="text-end">' + a.win.toFixed(0) + '%</td>' +
-    '<td class="text-end ' + pctClass(a.avg) + '">' + fmtPct(a.avg) + '</td>' +
-    '<td class="text-end ' + pctClass(a.total) + '">' + fmtPct(a.total, 1) + '</td>' +
-    '<td class="text-end text-muted-dss">' + a.tp + '/' + a.sl + '/' + a.to + '</td></tr>';
+function perfRow(label, a) {
+  if (!a) return '<tr><td>' + label + '</td><td class="r muted">0</td><td colspan="4" class="muted">-</td></tr>';
+  return '<tr><td>' + label + '</td><td class="r">' + a.n + '</td><td class="r">' + a.win.toFixed(0) + '%</td>' +
+    '<td class="r ' + pctClass(a.avg) + '">' + fmtPct(a.avg) + '</td><td class="r ' + pctClass(a.total) + '">' + fmtPct(a.total, 1) + '</td>' +
+    '<td class="r muted">' + a.tp + '/' + a.sl + '/' + a.to + '</td></tr>';
 }
-
+function ringSvg(frac, value, label, color) {
+  const R = 44, C = 2 * Math.PI * R, off = C * (1 - clamp(frac, 0, 1));
+  return '<div class="ring" style="color:' + color + '"><svg viewBox="0 0 100 100" aria-hidden="true">' +
+    '<circle class="bg" cx="50" cy="50" r="' + R + '"/>' +
+    '<circle class="tk" cx="50" cy="50" r="' + (R + 6) + '"/>' +
+    '<circle class="fg" cx="50" cy="50" r="' + R + '" stroke="' + color + '" stroke-dasharray="' + C.toFixed(1) + '" stroke-dashoffset="' + off.toFixed(1) + '" style="--c:' + C.toFixed(1) + '"/>' +
+    '</svg><div class="ring-txt"><b>' + value + '</b><small>' + label + '</small></div></div>';
+}
+function equityHtml(rows) {
+  const pts = rows.slice().sort((a, b) => a.created_at - b.created_at);
+  let cum = 0;
+  const vals = [0].concat(pts.map((r) => (cum += r.return_pct)));
+  const W = 600, H = 130, P = 6;
+  let min = Math.min(0, ...vals), max = Math.max(0, ...vals);
+  if (max - min < 0.5) { max += 0.25; min -= 0.25; }
+  const x = (i) => P + (W - 2 * P) * i / Math.max(1, vals.length - 1);
+  const y = (v) => P + (H - 2 * P) * (1 - (v - min) / (max - min));
+  const line = vals.map((v, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1)).join(' ');
+  const area = line + ' L' + x(vals.length - 1).toFixed(1) + ' ' + y(min).toFixed(1) + ' L' + x(0).toFixed(1) + ' ' + y(min).toFixed(1) + ' Z';
+  const last = vals[vals.length - 1];
+  const grid = [0.25, 0.5, 0.75].map((f) => '<line x1="0" x2="' + W + '" y1="' + (P + (H - 2 * P) * f) + '" y2="' + (P + (H - 2 * P) * f) + '" stroke="rgba(63,224,255,.08)" vector-effect="non-scaling-stroke"/>').join('');
+  return '<div class="equity-head"><span class="label">Kurva hasil kumulatif · ' + pts.length + ' sinyal</span><b class="' + pctClass(last) + '">' + fmtPct(last) + '</b></div>' +
+    '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-label="Kurva hasil kumulatif">' +
+      '<defs><linearGradient id="eqFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8c170" stop-opacity=".35"/><stop offset="1" stop-color="#e8c170" stop-opacity="0"/></linearGradient></defs>' +
+      grid +
+      '<line x1="0" x2="' + W + '" y1="' + y(0).toFixed(1) + '" y2="' + y(0).toFixed(1) + '" stroke="rgba(111,147,166,.6)" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>' +
+      '<path d="' + area + '" fill="url(#eqFill)"/>' +
+      '<path d="' + line + '" fill="none" stroke="#e8c170" stroke-width="2" vector-effect="non-scaling-stroke" style="filter:drop-shadow(0 0 4px rgba(232,193,112,.7))"/>' +
+    '</svg>' +
+    '<div class="equity-axis"><span>maks ' + fmtPct(max, 1) + '</span><span>garis putus = 0%</span><span>min ' + fmtPct(min, 1) + '</span></div>';
+}
 function renderPerformance() {
   const p = state.perf;
-  $('perfMode').textContent = p.mode === 'simulation' ? '(simulasi: Supabase belum dikonfigurasi)' : '';
-  if (p.error) {
-    $('perfWarn').innerHTML = '<div class="alert alert-danger py-2 small mb-2">Gagal membaca data kinerja: ' + escapeHtml(p.error) +
-      '. Jika kolom outcome belum ada, jalankan migration_v3.sql.</div>';
-    $('perfKpi').innerHTML = ''; $('perfGroups').innerHTML = ''; $('perfTickers').innerHTML = '';
-    return;
-  }
+  $('perfMode').textContent = p.mode === 'simulation' ? 'SIMULASI · bukan hasil nyata' : 'sinyal tertutup · belum termasuk komisi & slippage';
+  const clear = () => { $('perfTop').innerHTML = ''; $('perfEquity').innerHTML = ''; $('perfGroups').innerHTML = ''; $('perfTickers').innerHTML = ''; };
+  if (p.error) { $('perfWarn').innerHTML = '<div class="note err">Gagal membaca data kinerja: ' + escapeHtml(p.error) + '. Jika kolom outcome belum ada, jalankan migration_v3.sql.</div>'; clear(); return; }
   const all = aggregate(p.rows);
-  if (!all) {
-    $('perfWarn').innerHTML = '<div class="text-muted-dss small mb-2">Belum ada sinyal yang tertutup. Statistik muncul setelah sinyal pertama kena TP, SL, atau batas waktu.</div>';
-    $('perfKpi').innerHTML = ''; $('perfGroups').innerHTML = ''; $('perfTickers').innerHTML = '';
-    return;
-  }
-  $('perfWarn').innerHTML = all.n < PERF_MIN_SAMPLE
-    ? '<div class="alert alert-secondary py-2 small mb-2">Baru ' + all.n + ' sinyal tertutup. Butuh setidaknya ±' + PERF_MIN_SAMPLE + ' sebelum angka ini cukup bermakna untuk mengubah threshold.</div>'
-    : '';
-
-  const kpi = (label, value, cls = '', sub = '') =>
-    '<div class="col-6 col-md-4 col-xl-2"><div class="kpi"><div class="small-label">' + label + '</div><div class="v ' + cls + '">' + value + '</div>' +
-    (sub ? '<div class="tiny text-muted-dss">' + sub + '</div>' : '') + '</div></div>';
+  if (!all) { $('perfWarn').innerHTML = '<div class="note">Belum ada sinyal yang tertutup. Statistik muncul setelah sinyal pertama kena TP, SL, atau batas waktu.</div>'; clear(); return; }
+  $('perfWarn').innerHTML = all.n < PERF_MIN_SAMPLE ? '<div class="note">Baru ' + all.n + ' sinyal tertutup. Butuh sekitar ' + PERF_MIN_SAMPLE + ' sebelum angka ini cukup bermakna untuk mengubah threshold.</div>' : '';
   const pfTxt = all.pf === null ? '-' : (all.pf === Infinity ? '∞' : all.pf.toFixed(2));
-  $('perfKpi').innerHTML =
-    kpi('Sinyal tertutup', all.n, '', 'TP ' + all.tp + ' · SL ' + all.sl + ' · TO ' + all.to) +
-    kpi('Win rate', all.win.toFixed(0) + '%', '', 'return &gt; 0') +
-    kpi('Rata² / sinyal', fmtPct(all.avg), pctClass(all.avg), 'total ' + fmtPct(all.total, 1)) +
-    kpi('Profit factor', pfTxt, all.pf !== null && all.pf >= 1 ? 'pos' : 'neg', 'untung ÷ rugi') +
-    kpi('Rata² MFE / MAE', fmtPct(all.mfe, 2), 'pos', 'MAE ' + fmtPct(all.mae, 2)) +
-    kpi('Rata² durasi', isNum(all.mins) ? Math.round(all.mins) + ' mnt' : '-', '', 'sejak bar entry');
-
+  const pfFrac = all.pf === null ? 0 : (all.pf === Infinity ? 1 : all.pf / 3);
+  $('perfTop').innerHTML =
+    '<div class="rings">' + ringSvg(all.win / 100, all.win.toFixed(0) + '%', 'Win rate', COLORS.cyan) + ringSvg(pfFrac, pfTxt, 'Profit factor', COLORS.gold) + '</div>' +
+    '<div class="kpis">' +
+      '<div class="kpi"><span class="label">Tertutup</span><b>' + all.n + '</b><small>TP ' + all.tp + ' · SL ' + all.sl + ' · TO ' + all.to + '</small></div>' +
+      '<div class="kpi"><span class="label">Rata² / sinyal</span><b class="' + pctClass(all.avg) + '">' + fmtPct(all.avg) + '</b><small>total ' + fmtPct(all.total, 1) + '</small></div>' +
+      '<div class="kpi"><span class="label">MFE / MAE</span><b class="pos">' + fmtPct(all.mfe) + '</b><small>MAE ' + fmtPct(all.mae) + '</small></div>' +
+      '<div class="kpi"><span class="label">Durasi rata²</span><b>' + (isNum(all.mins) ? Math.round(all.mins) + ' mnt' : '-') + '</b><small>sejak bar entry</small></div>' +
+    '</div>';
+  $('perfEquity').innerHTML = equityHtml(p.rows);
   const by = (pred) => aggregate(p.rows.filter(pred));
-  $('perfGroups').innerHTML =
-    perfRow('<strong>Semua</strong>', all) +
-    perfRow('Alert terkirim', by((r) => r.alert_sent)) +
-    perfRow('Diblokir guardrail', by((r) => r.blocked)) +
-    Object.keys(GUARD).map((k) => perfRow('<span class="badge ' + GUARD[k].cls + '">' + GUARD[k].label + '</span>', by((r) => r.ai_status === k))).join('');
-
+  $('perfGroups').innerHTML = perfRow('<b>Semua</b>', all) + perfRow('Alert terkirim', by((r) => r.alert_sent)) + perfRow('Diblokir guardrail', by((r) => r.blocked)) +
+    Object.keys(GUARD).map((k) => perfRow('<span class="badge b-g g-' + k + '">' + GUARD[k] + '</span>', by((r) => r.ai_status === k))).join('');
   const tickers = Array.from(new Set(p.rows.map((r) => r.ticker)));
-  const tickerAgg = tickers.map((t) => ({ t, a: by((r) => r.ticker === t) })).sort((x, y) => y.a.n - x.a.n || y.a.avg - x.a.avg);
-  $('perfTickers').innerHTML = tickerAgg.map((x) => perfRow('<span class="ticker-cell">' + escapeHtml(x.t) + '</span>', x.a)).join('');
+  $('perfTickers').innerHTML = tickers.map((t) => ({ t, a: by((r) => r.ticker === t) })).sort((x, y) => y.a.n - x.a.n || y.a.avg - x.a.avg)
+    .map((x) => perfRow('<b>' + escapeHtml(x.t) + '</b>', x.a)).join('');
 }
 
 /* =====================================================================
- *  ALERT
+ *  LOG MISI
  * ===================================================================== */
-function showAlert(msg, type = 'warning') {
-  $('alertBox').innerHTML =
-    '<div class="alert alert-' + type + ' alert-dismissible fade show py-2 small" role="alert">' + escapeHtml(msg) +
-    '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>';
-}
-function clearAlert() { $('alertBox').innerHTML = ''; }
-
-/* =====================================================================
- *  REFRESH
- * ===================================================================== */
-function setLoading(on) {
-  state.loading = on;
-  $('btnRefresh').disabled = on;
-  $('btnSpinner').classList.toggle('d-none', !on);
-  $('btnLabel').textContent = on ? 'Memuat...' : 'Refresh Data';
-}
-
-// Data simulasi HANYA dipakai saat URL Supabase belum diisi (mode uji UI).
-// Jika URL sudah diisi lalu refresh gagal, dashboard tetap menampilkan snapshot live terakhir
-// dengan tanda GAGAL REFRESH, atau tidak menampilkan apa pun jika belum pernah berhasil.
-// Sinyal acak tidak pernah dicampur dengan mode live supaya tidak disangka sinyal sungguhan.
-async function refreshSnapshot() {
-  if (!isUrlConfigured()) {
-    state.data = fallbackMockData();
-    state.mode = 'simulation';
-    state.liveError = null;
-    showAlert('URL Supabase belum diisi. Menampilkan data SIMULASI agar UI dapat diuji.', 'info');
-    return;
-  }
-  try {
-    state.data = await fetchLiveDataFromSupabase();
-    state.mode = 'live';
-    state.liveError = null;
-    clearAlert();
-  } catch (e) {
-    state.liveError = e.message;
-    if (state.mode === 'live' && state.data) {
-      showAlert('Gagal refresh data live (' + e.message + '). Yang tampil adalah snapshot terakhir dari ' +
-        fmtWibTime(new Date(state.data.generated_at)) + ' WIB, jangan dipakai sebagai sinyal terkini.', 'danger');
-    } else {
-      state.data = null;
-      state.mode = 'none';
-      showAlert('Gagal mengambil data live (' + e.message + '). Belum ada data yang bisa ditampilkan.', 'danger');
-    }
-  }
-}
-
-async function refreshHistory() {
-  if (!isDbConfigured()) {
-    const m = mockHistory();
-    state.history = { rows: m.rows, total: m.total, mode: 'simulation', error: null };
-    state.perf = { rows: mockPerformance(), mode: 'simulation', error: null };
-    return;
-  }
-  const [h, p] = await Promise.allSettled([fetchSignalHistory(), fetchPerformance()]);
-  state.history = h.status === 'fulfilled'
-    ? { rows: h.value.rows, total: h.value.total, mode: 'live', error: null }
-    : { rows: [], total: null, mode: 'live', error: h.reason.message };
-  state.perf = p.status === 'fulfilled'
-    ? { rows: p.value, mode: 'live', error: null }
-    : { rows: [], mode: 'live', error: p.reason.message };
-}
-
-async function refreshData() {
-  if (state.loading) return;
-  setLoading(true);
-  try {
-    await Promise.all([refreshSnapshot(), refreshHistory()]);
-    state.lastRefreshAt = Date.now();
-    renderAll();
-  } finally {
-    setLoading(false);
-  }
-}
-
-/* =====================================================================
- *  RENDER: STATUS BAR
- * ===================================================================== */
-function updateStatusBar() {
-  const now = new Date();
-  const market = getMarketStatus(now);
-  const mb = $('marketBadge');
-  mb.className = 'badge ' + (market.open ? 'text-bg-success' : 'text-bg-secondary');
-  mb.textContent = (market.open ? 'Pasar AS Buka' : 'Pasar AS Tutup') + ' · NY ' + market.nyTime;
-
-  const sb = $('statusBadge');
-  const lu = $('lastUpdated');
-  if (!state.data) {
-    if (state.mode === 'none') {
-      sb.className = 'badge text-bg-danger';
-      sb.textContent = 'Tidak Ada Data';
-    } else {
-      sb.className = 'badge text-bg-secondary';
-      sb.textContent = 'Memuat...';
-    }
-    lu.textContent = 'Last updated: -';
-    return;
-  }
-
-  const gen = new Date(state.data.generated_at);
-  const ageMs = now.getTime() - gen.getTime();
-  const ageSec = Math.max(0, Math.round(ageMs / 1000));
-  const ageTxt = ageSec < 60 ? ageSec + ' dtk lalu' : Math.round(ageSec / 60) + ' mnt lalu';
-
-  if (state.mode === 'live') {
-    const stale = market.open && (ageMs > STALE_AFTER_MS || state.data.fresh === false);
-    const bad = stale || !!state.liveError;
-    sb.className = 'badge ' + (bad ? 'text-bg-danger' : 'text-bg-success') + (bad ? '' : ' pulse');
-    sb.textContent = state.liveError ? 'Live Data (GAGAL REFRESH)' : (stale ? 'Live Data (STALE)' : 'Live Data');
-  } else {
-    sb.className = 'badge text-bg-warning';
-    sb.textContent = 'Simulation';
-  }
-  lu.textContent = 'Last updated: ' + fmtWibTime(gen) + ' WIB (' + ageTxt + ') · bar ' + fmtWibTime(new Date(state.data.timestamp), false);
-}
-
-/* =====================================================================
- *  RENDER: GRAPH (RADIAL, POSISI TETAP)
- * ===================================================================== */
-function initNetwork() {
-  nodesDS = new vis.DataSet();
-  edgesDS = new vis.DataSet();
-  network = new vis.Network($('graph'), { nodes: nodesDS, edges: edgesDS }, {
-    physics: false,
-    interaction: { hover: true, dragNodes: false, zoomView: true, dragView: true, tooltipDelay: 80 },
-    nodes: { shape: 'dot', borderWidth: 2, font: { color: '#ffffff', size: 14, face: 'system-ui, sans-serif' } },
-    edges: { smooth: false, font: { color: '#b5b5ba', size: 11, strokeWidth: 0, align: 'middle' } }
-  });
-  network.on('click', (params) => {
-    if (params.nodes.length && params.nodes[0] !== BENCHMARK) selectTicker(params.nodes[0]);
-  });
-  // Setelah pengguna zoom/geser, jangan paksa fit lagi saat data diperbarui
-  network.on('zoom', () => { userMovedView = true; });
-  network.on('dragEnd', (p) => { if (!p.nodes.length) userMovedView = true; });
-  window.addEventListener('resize', () => { if (network && !userMovedView) network.fit({ animation: false }); });
-}
-
-function renderGraph(rows) {
-  const bench = state.data.benchmark;
-  const n = rows.length;
-  const nodes = [];
-  const edges = [];
-
-  nodes.push({
-    id: BENCHMARK,
-    label: bench.ticker + '\n' + fmtPct(bench.return_15m),
-    title: bench.ticker + ' (Benchmark)\nReturn 15m: ' + fmtPct(bench.return_15m),
-    x: 0, y: 0, fixed: true, size: 38,
-    color: { background: COLORS.blue, border: '#93b8ff', highlight: { background: COLORS.blue, border: '#fff' }, hover: { background: COLORS.blue, border: '#fff' } },
-    font: { color: '#ffffff', size: 16, bold: true }
-  });
-
-  rows.forEach((s, i) => {
-    const meta = SIGNALS[s.signal];
-    const angle = (2 * Math.PI * i) / Math.max(n, 1) - Math.PI / 2;
-    const absR = clamp(Math.abs(s.correlation), 0, 1);
-    const radius = 170 + (1 - absR) * 230;   // korelasi tinggi = dekat ke hub
-    const isSel = state.selected === s.ticker;
-    const isBuy = s.signal === 'BUY_LAGGING';
-
-    nodes.push({
-      id: s.ticker,
-      label: s.ticker + '\n' + fmtPct(s.return_15m),
-      title: s.ticker + '\nKorelasi: ' + s.correlation.toFixed(2) + '  β: ' + fmtNum(s.beta) +
-        '\nReturn 15m: ' + fmtPct(s.return_15m) + ' (ekspektasi ' + fmtPct(s.expected_return) + ')' +
-        '\nLag z: ' + fmtSigned(s.lag_z) + '\nSinyal: ' + meta.label,
-      x: Math.cos(angle) * radius,
-      y: Math.sin(angle) * radius,
-      fixed: true,
-      size: isBuy ? 28 : 22,
-      borderWidth: isSel ? 5 : (isBuy ? 4 : 2),
-      color: {
-        background: meta.color,
-        border: isSel ? '#ffffff' : (isBuy ? '#fff3c4' : 'rgba(255,255,255,0.35)'),
-        highlight: { background: meta.color, border: '#ffffff' },
-        hover: { background: meta.color, border: '#ffffff' }
-      },
-      shadow: isBuy ? { enabled: true, color: 'rgba(255,193,7,0.65)', size: 22, x: 0, y: 0 } : { enabled: false }
-    });
-
-    edges.push({
-      id: 'e-' + s.ticker,
-      from: BENCHMARK,
-      to: s.ticker,
-      width: 1 + absR * 9,
-      dashes: s.correlation < 0,
-      label: 'r=' + s.correlation.toFixed(2),
-      title: BENCHMARK + ' ↔ ' + s.ticker + '\nr = ' + s.correlation.toFixed(3) + '\nβ = ' + fmtNum(s.beta, 3),
-      color: { color: meta.color, highlight: meta.color, hover: meta.color, opacity: s.signal === 'NEUTRAL' ? 0.55 : 0.95 }
-    });
-  });
-
-  nodesDS.clear();
-  edgesDS.clear();
-  nodesDS.add(nodes);
-  edgesDS.add(edges);
-  if (!userMovedView) setTimeout(() => network.fit({ animation: false }), 30);
-}
-
-/* =====================================================================
- *  RENDER: TABEL SINYAL
- * ===================================================================== */
-function levelsOf(s) {
-  const cfg = state.data && state.data.config;
-  const slPct = cfg && isNum(cfg.sl) ? cfg.sl : DEFAULT_SL_PCT;
-  const tpPct = cfg && isNum(cfg.tp) ? cfg.tp : DEFAULT_TP_PCT;
-  if (!isNum(s.price)) return null;
-  return {
-    sl: isNum(s.stop_loss) ? s.stop_loss : s.price * (1 - slPct / 100),
-    tp: isNum(s.take_profit) ? s.take_profit : s.price * (1 + tpPct / 100)
-  };
-}
-
-function renderTable(rows) {
-  const counts = { BUY_LAGGING: 0, MOMENTUM: 0, DIVERGENT: 0, AVOID: 0, NEUTRAL: 0 };
-  $('signalBody').innerHTML = rows.map((s) => {
-    counts[s.signal]++;
-    const meta = SIGNALS[s.signal];
-    const lv = levelsOf(s);
-    const sltp = (s.signal === 'BUY_LAGGING' && lv)
-      ? '<span class="neg">' + lv.sl.toFixed(2) + '</span> / <span class="pos">' + lv.tp.toFixed(2) + '</span>'
-      : '<span class="text-muted-dss">-</span>';
-    const cls = ['clickable', s.signal === 'BUY_LAGGING' ? 'row-buy' : '', state.selected === s.ticker ? 'selected' : ''].join(' ').trim();
-    return '<tr class="' + cls + '" data-ticker="' + escapeHtml(s.ticker) + '">' +
-      '<td class="ticker-cell">' + escapeHtml(s.ticker) + '</td>' +
-      '<td class="text-end">' + fmtPrice(s.price) + '</td>' +
-      '<td class="text-end">' + s.correlation.toFixed(2) + '</td>' +
-      '<td class="text-end">' + fmtNum(s.beta) + '</td>' +
-      '<td class="text-end ' + pctClass(s.return_15m) + '">' + fmtPct(s.return_15m) + '</td>' +
-      '<td class="text-end text-muted-dss">' + fmtPct(s.expected_return) + '</td>' +
-      '<td class="text-end ' + zClass(s.lag_z, state.cfg) + '">' + fmtSigned(s.lag_z) + '</td>' +
-      '<td class="text-end text-muted-dss">' + fmtVolume(s.volume) + '</td>' +
-      '<td><span class="badge badge-signal ' + meta.badge + '">' + meta.label + '</span></td>' +
-      '<td class="text-end">' + sltp + '</td></tr>';
-  }).join('') || '<tr><td colspan="10" class="text-center text-muted-dss py-4">Tidak ada saham yang lolos perhitungan pada snapshot ini (lihat catatan "Dilewati" di bawah).</td></tr>';
-
-  $('signalSummary').innerHTML =
-    '<span class="badge badge-buy me-1">BUY ' + counts.BUY_LAGGING + '</span>' +
-    '<span class="badge badge-momentum me-1">MOM ' + counts.MOMENTUM + '</span>' +
-    '<span class="badge badge-divergent me-1">DIV ' + counts.DIVERGENT + '</span>' +
-    '<span class="badge badge-avoid me-1">AVOID ' + counts.AVOID + '</span>' +
-    '<span class="badge badge-neutral">NEU ' + counts.NEUTRAL + '</span>';
-
-  const sk = state.data.skipped;
-  $('skippedNote').innerHTML = sk.length
-    ? 'Dilewati (data belum cukup): ' + sk.map((x) => '<strong>' + escapeHtml(x.ticker) + '</strong> (' + escapeHtml(x.reason) + ')').join(', ')
-    : '';
-
-  const c = state.data.config;
-  const v = (x) => (x === null || x === undefined ? '-' : x);
-  $('serverCfg').textContent = c
-    ? 'Threshold server: QQQ > +' + v(c.qqq) + '% · r ≥ ' + v(c.corr) + ' · BUY jika −' + v(c.zDiv) + ' < z ≤ −' + v(c.zLag) +
-      ' · SL ' + v(c.slAtr) + '×ATR / TP ' + v(c.tpAtr) + '×ATR · batas waktu ' + v(c.holdMax) + ' mnt'
-    : '';
-}
-
-/* =====================================================================
- *  RENDER: PANEL DETAIL
- * ===================================================================== */
-function renderDetail(rows) {
-  const panel = $('detailPanel');
-  const s = rows.find((r) => r.ticker === state.selected);
-  if (!s) {
-    panel.innerHTML = '<p class="text-muted-dss mb-0">Klik sebuah node di graph atau baris di tabel untuk melihat detail dan alasan sinyal.</p>';
-    return;
-  }
-  const meta = SIGNALS[s.signal];
-  const bench = state.data.benchmark;
-  const lv = levelsOf(s);
-  const cell = (label, value, cls = '', col = 'col-6') =>
-    '<div class="' + col + '"><div class="small-label">' + label + '</div><div class="detail-value ' + cls + '">' + value + '</div></div>';
-  let levels = '';
-  if (lv) {
-    const slPct = (lv.sl / s.price - 1) * 100, tpPct = (lv.tp / s.price - 1) * 100;
-    const basis = s.sl_method === 'ATR' ? 'basis ATR' : (s.sl_method === 'PCT' ? 'basis persen' : '');
-    levels =
-      cell('Stop-loss (' + fmtPct(slPct, 2) + ')', lv.sl.toFixed(2), 'neg') +
-      cell('Take-profit (' + fmtPct(tpPct, 2) + ')', lv.tp.toFixed(2), 'pos') +
-      cell('Rasio R:R', '1 : ' + (tpPct / Math.abs(slPct)).toFixed(1)) +
-      cell('ATR (5m, 14 bar)' + (basis ? ' <span class="tiny">· ' + basis + '</span>' : ''), isNum(s.atr) ? s.atr.toFixed(2) : '-');
-  }
-  panel.innerHTML =
-    '<div class="d-flex justify-content-between align-items-center mb-3">' +
-      '<span class="fs-4 fw-bold">' + escapeHtml(s.ticker) + '</span>' +
-      '<span class="badge badge-signal ' + meta.badge + '">' + meta.label + '</span></div>' +
-    '<div class="row g-3 mb-3">' +
-      cell('Harga', fmtPrice(s.price)) +
-      cell('Volume 15m', fmtVolume(s.volume)) +
-      cell('Korelasi ke ' + escapeHtml(bench.ticker), s.correlation.toFixed(3) + (isNum(s.corr_samples) ? ' <span class="tiny text-muted-dss">n=' + s.corr_samples + '</span>' : '')) +
-      cell('Beta (<span class="nc">β</span>)', fmtNum(s.beta, 2)) +
-      cell('Return 15m', fmtPct(s.return_15m), pctClass(s.return_15m)) +
-      cell('Ekspektasi (<span class="nc">β</span> × QQQ)', fmtPct(s.expected_return), pctClass(s.expected_return)) +
-      cell('Selisih vs ekspektasi', fmtPct(s.lag_gap), pctClass(s.lag_gap)) +
-      cell('Lag z <span class="tiny nc">(σ ' + (isNum(s.resid_sigma_15m) ? s.resid_sigma_15m.toFixed(2) + '%' : '-') + ')</span>', fmtSigned(s.lag_z), zClass(s.lag_z, state.cfg)) +
-      levels +
-    '</div>' +
-    '<div class="small text-muted-dss">' + escapeHtml(explainSignal(s, bench, state.cfg, s.signal)) + '</div>' +
-    (s.signal === 'BUY_LAGGING' && lv ? '<div class="small text-muted-dss mt-2 fst-italic">Level SL/TP hanya ilustrasi, bukan rekomendasi.</div>' : '');
-}
-
-/* =====================================================================
- *  RENDER: RIWAYAT SINYAL
- * ===================================================================== */
-function outcomeCell(r) {
-  if (!r.outcome) return '<span class="text-muted-dss">-</span>';
-  const o = OUTCOME[r.outcome];
-  const tip = 'MFE ' + fmtPct(r.mfe_pct) + ' · MAE ' + fmtPct(r.mae_pct) + (isNum(r.bars_held) ? ' · ' + r.bars_held + ' bar' : '');
-  let extra = '';
-  if (isNum(r.return_pct)) extra = ' <span class="' + pctClass(r.return_pct) + '">' + fmtPct(r.return_pct) + '</span>';
-  else if (r.outcome === 'OPEN' && (isNum(r.mfe_pct) || isNum(r.mae_pct))) extra = ' <span class="tiny text-muted-dss">' + escapeHtml(tip) + '</span>';
-  return '<span class="badge ' + o.cls + '" title="' + escapeHtml(tip) + '">' + o.label + '</span>' + extra;
-}
-
 function renderHistory() {
-  const h = state.history;
-  const tbody = $('historyBody');
-  $('historyMode').textContent = h.mode === 'simulation' ? '(simulasi: Supabase belum dikonfigurasi)' : '';
-
-  if (h.error) {
-    $('historySummary').innerHTML = '';
-    tbody.innerHTML = '<tr><td colspan="10" class="text-center text-danger py-4">Gagal membaca riwayat: ' + escapeHtml(h.error) + '</td></tr>';
-    return;
-  }
-
+  const h = state.history, box = $('historyBody');
+  $('historyMode').textContent = h.mode === 'simulation' ? 'SIMULASI · contoh log, bukan sinyal nyata' : '';
+  if (h.error) { $('historySummary').innerHTML = ''; box.innerHTML = '<div class="note err">Gagal membaca log: ' + escapeHtml(h.error) + '</div>'; return; }
   const cnt = { PASSED: 0, NO_NEWS: 0, BYPASSED: 0, REJECTED: 0 };
   h.rows.forEach((r) => { cnt[r.ai_status]++; });
-  $('historySummary').innerHTML =
-    '<span class="text-muted-dss me-2">Total ' + (isNum(h.total) ? h.total : h.rows.length) + ' (tampil ' + h.rows.length + ')</span>' +
-    Object.keys(GUARD).map((k) => '<span class="badge ' + GUARD[k].cls + ' me-1">' + GUARD[k].label + ' ' + cnt[k] + '</span>').join('');
-
-  if (!h.rows.length) {
-    tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted-dss py-4">Belum ada sinyal tercatat. Jika yakin sudah ada, pastikan policy RLS baca untuk anon sudah dibuat (lihat migration.sql).</td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = h.rows.map((r) => {
-    const g = GUARD[r.ai_status];
-    const pct = (v) => (isNum(v) && isNum(r.entry_price) && r.entry_price) ? ' <span class="tiny text-muted-dss">(' + fmtPct((v / r.entry_price - 1) * 100, 1) + ')</span>' : '';
-    return '<tr>' +
-      '<td class="text-muted-dss">' + escapeHtml(isNaN(r.created_at.getTime()) ? '-' : fmtWibDateTime(r.created_at)) + '</td>' +
-      '<td class="ticker-cell">' + escapeHtml(r.ticker) + '</td>' +
-      '<td class="text-end ' + pctClass(r.qqq_return) + '">' + fmtPct(r.qqq_return) + '</td>' +
-      '<td class="text-end ' + pctClass(r.stock_return) + '">' + fmtPct(r.stock_return) + '</td>' +
-      '<td class="text-end">' + fmtSigned(r.lag_z) + '</td>' +
-      '<td class="text-end">' + fmtPrice(r.entry_price) + '</td>' +
-      '<td class="text-end neg">' + (isNum(r.stop_loss) ? r.stop_loss.toFixed(2) : '-') + pct(r.stop_loss) + '</td>' +
-      '<td class="text-end pos">' + (isNum(r.take_profit) ? r.take_profit.toFixed(2) : '-') + pct(r.take_profit) + '</td>' +
-      '<td><span class="badge ' + g.cls + '" title="' + escapeHtml(r.ai_reason) + '">' + g.label + '</span>' +
-        (r.ai_reason ? ' <span class="tiny text-muted-dss d-none d-xl-inline">' + escapeHtml(r.ai_reason.slice(0, 50)) + '</span>' : '') + '</td>' +
-      '<td>' + outcomeCell(r) + '</td></tr>';
+  $('historySummary').innerHTML = '<span class="badge b-g muted" style="border-color:var(--line)">TOTAL ' + (isNum(h.total) ? h.total : h.rows.length) + '</span>' +
+    Object.keys(GUARD).map((k) => '<span class="badge b-g g-' + k + '">' + GUARD[k] + ' ' + cnt[k] + '</span>').join('');
+  if (!h.rows.length) { box.innerHTML = '<div class="muted">Belum ada sinyal tercatat. Jika yakin sudah ada, pastikan policy RLS baca untuk anon sudah dibuat.</div>'; return; }
+  box.innerHTML = h.rows.map((r) => {
+    let res = '<span class="muted">-</span>';
+    if (r.outcome) {
+      res = '<span class="o-' + r.outcome + '">' + OUTCOME[r.outcome] + '</span>';
+      if (isNum(r.return_pct)) res += ' <span class="' + pctClass(r.return_pct) + '">' + fmtPct(r.return_pct) + '</span>';
+      else if (r.outcome === 'OPEN' && (isNum(r.mfe_pct) || isNum(r.mae_pct))) res += ' <span class="muted">MFE ' + fmtPct(r.mfe_pct) + ' / MAE ' + fmtPct(r.mae_pct) + '</span>';
+    }
+    return '<div class="log-line">' +
+      '<span class="t">' + escapeHtml(isNaN(r.created_at.getTime()) ? '-' : fmtWibDateTime(r.created_at)) + '</span>' +
+      '<span class="tk">' + escapeHtml(r.ticker) + '</span>' +
+      '<span class="arrow">▸</span><span>z <span class="z-buy">' + fmtSigned(r.lag_z) + '</span></span>' +
+      '<span class="muted">QQQ ' + fmtPct(r.qqq_return) + '</span>' +
+      '<span>IN ' + fmtPrice(r.entry_price) + '</span>' +
+      '<span class="muted">SL ' + fmtNum(r.stop_loss) + ' · TP ' + fmtNum(r.take_profit) + '</span>' +
+      '<span class="arrow">▸</span><span class="g-' + r.ai_status + '">' + GUARD[r.ai_status] + '</span>' +
+      '<span class="arrow">▸</span>' + res +
+      (r.ai_reason ? '<span class="why">› ' + escapeHtml(r.ai_reason) + '</span>' : '') +
+    '</div>';
   }).join('');
 }
 
@@ -1145,21 +1434,24 @@ function renderHistory() {
  *  RENDER ALL
  * ===================================================================== */
 function renderNoData() {
-  nodesDS.clear();
-  edgesDS.clear();
-  $('signalBody').innerHTML = '<tr><td colspan="10" class="text-center text-danger py-4">Data live belum tersedia. Coba Refresh Data beberapa saat lagi.</td></tr>';
-  $('signalSummary').innerHTML = '';
-  $('skippedNote').innerHTML = '';
-  $('serverCfg').textContent = '';
-  $('detailPanel').innerHTML = '<p class="text-muted-dss mb-0">Tidak ada data.</p>';
+  state.rows = []; state.positions = {};
+  nodesDS.clear(); edgesDS.clear();
+  $('signalBody').innerHTML = '<tr class="empty-row"><td colspan="10">Data live belum tersedia. Coba Refresh beberapa saat lagi.</td></tr>';
+  $('signalCards').innerHTML = '<div class="muted">Data live belum tersedia.</div>';
+  $('signalSummary').innerHTML = ''; $('skippedNote').innerHTML = ''; $('serverCfg').textContent = '';
+  $('detailPanel').innerHTML = '<p class="lock-empty">Tidak ada data.</p>';
 }
-
-function renderAll() {
+function renderAll(lockAnimate = false) {
   if (state.data) {
     const rows = computeSignals();
+    state.rows = rows;
+    if (!rows.some((r) => r.ticker === state.selected)) {
+      state.selected = rows.length ? rows[0].ticker : null;
+      state.lockStart = performance.now(); lockAnimate = true;
+    }
     renderGraph(rows);
-    renderTable(rows);
-    renderDetail(rows);
+    renderSignals(rows);
+    renderLock(rows, lockAnimate);
   } else if (state.mode === 'none') {
     renderNoData();
   }
@@ -1167,14 +1459,20 @@ function renderAll() {
   renderHistory();
   updateStatusBar();
 }
-
-function selectTicker(ticker) {
-  state.selected = ticker;
-  renderAll();
+function selectTicker(tk) {
+  if (state.selected === tk) return;
+  state.selected = tk;
+  state.lockStart = performance.now();
+  renderAll(true);
+  if (window.innerWidth <= 1000) {
+    const lock = $('detailPanel').closest('.panel');
+    const r = lock.getBoundingClientRect();
+    if (r.top < 60 || r.top > window.innerHeight * 0.6) lock.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' });
+  }
 }
 
 /* =====================================================================
- *  PENGATURAN THRESHOLD (UI)
+ *  KALIBRASI
  * ===================================================================== */
 function syncCfgLabels() {
   $('lblQqq').textContent = '> +' + state.cfg.qqqThreshold.toFixed(2) + '%';
@@ -1183,30 +1481,53 @@ function syncCfgLabels() {
   $('lblZDiv').textContent = 'z ≤ −' + effZDiv(state.cfg).toFixed(2);
 }
 function syncCfgInputs() {
-  $('rngQqq').value = state.cfg.qqqThreshold;
-  $('rngCorr').value = state.cfg.corrThreshold;
-  $('rngZLag').value = state.cfg.zLag;
-  $('rngZDiv').value = state.cfg.zDiv;
+  $('rngQqq').value = state.cfg.qqqThreshold; $('rngCorr').value = state.cfg.corrThreshold;
+  $('rngZLag').value = state.cfg.zLag; $('rngZDiv').value = state.cfg.zDiv;
   syncCfgLabels();
 }
 function bindCfgInputs() {
-  const bind = (id, key) => {
-    $(id).addEventListener('input', (e) => {
-      state.cfg[key] = parseFloat(e.target.value);
-      syncCfgLabels();
-      saveCfg();
-      renderAll();
-    });
-  };
-  bind('rngQqq', 'qqqThreshold');
-  bind('rngCorr', 'corrThreshold');
-  bind('rngZLag', 'zLag');
-  bind('rngZDiv', 'zDiv');
-  $('btnResetCfg').addEventListener('click', () => {
-    state.cfg = Object.assign({}, DEFAULT_CFG);
-    saveCfg();
-    syncCfgInputs();
-    renderAll();
+  [['rngQqq', 'qqqThreshold'], ['rngCorr', 'corrThreshold'], ['rngZLag', 'zLag'], ['rngZDiv', 'zDiv']].forEach(([id, key]) => {
+    $(id).addEventListener('input', (e) => { state.cfg[key] = parseFloat(e.target.value); syncCfgLabels(); saveCfg(); renderAll(); });
+  });
+  $('btnResetCfg').addEventListener('click', () => { state.cfg = Object.assign({}, DEFAULT_CFG); saveCfg(); syncCfgInputs(); renderAll(); });
+}
+
+/* =====================================================================
+ *  BOOT SEQUENCE (sekali per sesi browser; dilewati jika "kurangi gerakan")
+ * ===================================================================== */
+function runBoot(dataPromise) {
+  const boot = $('boot');
+  let seen = storeGet(BOOT_SESSION_KEY, 'session') === '1';
+  if (REDUCED || seen) return Promise.resolve();
+  storeSet(BOOT_SESSION_KEY, '1', 'session');
+  state.booting = true;
+  boot.hidden = false;
+  const log = $('bootLog'), bar = $('bootBar');
+  let skipped = false;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, skipped ? 0 : ms));
+  const line = (txt, status, cls = '') => { const d = document.createElement('div'); d.innerHTML = escapeHtml(txt) + ' ' + '.'.repeat(Math.max(2, 30 - txt.length)) + ' <b class="' + cls + '">' + escapeHtml(status) + '</b>'; log.appendChild(d); };
+  return new Promise((resolve) => {
+    const finish = () => {
+      if (!boot.classList.contains('out')) {
+        boot.classList.add('out');
+        setTimeout(() => { boot.hidden = true; }, 460);
+        state.booting = false;
+        resolve();
+      }
+    };
+    boot.addEventListener('click', () => { skipped = true; finish(); }, { once: true });
+    (async () => {
+      line('INISIALISASI INTI HUD', 'OK'); bar.style.width = '18%'; await sleep(230);
+      line('KALIBRASI RADAR KORELASI', 'OK'); bar.style.width = '36%'; await sleep(230);
+      line(DEMO_MODE || !isUrlConfigured() ? 'MODE DEMO' : 'TAUTAN SUPABASE / dss-sna', 'OK'); bar.style.width = '52%';
+      const ok = await Promise.race([dataPromise.then(() => true, () => false), new Promise((r) => setTimeout(() => r(null), 4000))]);
+      const st = state.mode === 'live' ? 'LIVE' : state.mode === 'simulation' ? 'SIMULASI' : 'GAGAL';
+      line('MEMUAT SNAPSHOT PASAR', ok === null ? 'TERTUNDA' : st, st === 'GAGAL' || ok === null ? 'warn' : ''); bar.style.width = '74%'; await sleep(230);
+      const nBuy = state.rows.filter((r) => r.signal === 'BUY_LAGGING').length;
+      line('PEMINDAIAN TARGET', nBuy + ' BUY'); bar.style.width = '90%'; await sleep(230);
+      line('SISTEM SIAP', 'ONLINE'); bar.style.width = '100%'; await sleep(380);
+      finish();
+    })();
   });
 }
 
@@ -1214,29 +1535,43 @@ function bindCfgInputs() {
  *  INISIALISASI
  * ===================================================================== */
 document.addEventListener('DOMContentLoaded', () => {
+  try {
+    const prefs = JSON.parse(storeGet(PREF_STORAGE_KEY) || '{}');
+    if (typeof prefs.auto === 'boolean') $('autoRefresh').checked = prefs.auto;
+  } catch (e) { /* abaikan */ }
+  const savePrefs = () => storeSet(PREF_STORAGE_KEY, JSON.stringify({ auto: $('autoRefresh').checked }));
+  $('autoRefresh').addEventListener('change', savePrefs);
+  $('sfx').addEventListener('change', () => { if ($('sfx').checked) beep(true); });
+
   initNetwork();
   syncCfgInputs();
   bindCfgInputs();
 
   $('btnRefresh').addEventListener('click', refreshData);
-  $('btnResetView').addEventListener('click', () => { userMovedView = false; if (network) network.fit({ animation: false }); });
-
-  $('signalBody').addEventListener('click', (e) => {
-    const tr = e.target.closest('tr[data-ticker]');
-    if (tr) selectTicker(tr.getAttribute('data-ticker'));
+  $('btnCalib').addEventListener('click', () => {
+    const body = $('calibBody'), open = body.hidden;
+    body.hidden = !open;
+    $('btnCalib').textContent = open ? 'Tutup' : 'Buka';
+    $('btnCalib').setAttribute('aria-expanded', String(open));
   });
+  $('btnResetView').addEventListener('click', () => { userMovedView = false; fitRadar(); });
+  const pick = (e) => { const el = e.target.closest('[data-ticker]'); if (el) selectTicker(el.getAttribute('data-ticker')); };
+  $('signalBody').addEventListener('click', pick);
+  $('signalCards').addEventListener('click', pick);
 
-  // Auto refresh: lewati saat tab tersembunyi; saat tab kembali terlihat, segarkan jika data sudah > 30 dtk
   setInterval(() => { if ($('autoRefresh').checked && !document.hidden) refreshData(); }, REFRESH_INTERVAL_MS);
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && $('autoRefresh').checked && Date.now() - state.lastRefreshAt > 30000) refreshData();
   });
-
-  // Perbarui umur data & jam pasar tiap detik
   setInterval(updateStatusBar, 1000);
-
   updateStatusBar();
-  refreshData();
+
+  const first = refreshData();
+  runBoot(first).then(() => {
+    $('main').classList.add('reveal');
+    if (state.pendingAcquire) { state.pendingAcquire = false; detectAcquisitions(); }
+    fitRadar();
+  });
 });
 </script>
 </body>
