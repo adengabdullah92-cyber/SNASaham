@@ -385,19 +385,22 @@ footer.disc { font-size: 11.5px; color: var(--muted); max-width: 95ch; }
     <div class="boot-title">STOCK SNA <span>//</span> DSS</div>
     <div class="login-sub">Akses terbatas · login diperlukan</div>
     <div id="stepEmail" class="login-step">
-      <label for="loginEmail" class="label">Email terdaftar</label>
-      <input id="loginEmail" name="email" type="email" class="hud-input" autocomplete="email" inputmode="email" autocapitalize="off" spellcheck="false" placeholder="nama@email.com">
-      <button id="btnSend" class="btn-hud" type="submit">Kirim kode akses</button>
+      <label for="loginEmail" class="label">Email</label>
+      <input id="loginEmail" name="email" type="email" class="hud-input" autocomplete="username" inputmode="email" autocapitalize="off" spellcheck="false" placeholder="nama@email.com">
+      <label for="loginPass" class="label">Password</label>
+      <input id="loginPass" name="password" type="password" class="hud-input" autocomplete="current-password" placeholder="••••••••">
+      <button id="btnSend" class="btn-hud" type="submit">Masuk</button>
+      <button id="btnMagic" class="btn-mini" type="button">Lupa password? Kirim tautan login ke email</button>
     </div>
     <div id="stepCode" class="login-step" hidden>
-      <label for="loginCode" class="label">Kode dari email <span id="codeEmail" class="nc gold"></span></label>
+      <div class="login-hint">Tautan login dikirim ke <span id="codeEmail" class="nc gold"></span>. Buka tautan itu di browser ini juga. Di iPhone, tekan lama tautannya lalu pilih buka di Safari.</div>
+      <label for="loginCode" class="label">Kode dari email (jika email berisi kode)</label>
       <input id="loginCode" name="code" type="text" class="hud-input mono" autocomplete="one-time-code" inputmode="numeric" maxlength="10" placeholder="••••••">
-      <button id="btnVerify" class="btn-hud" type="submit">Masuk</button>
+      <button id="btnVerify" class="btn-hud" type="submit">Masuk dengan kode</button>
       <div class="login-row">
-        <button id="btnBack" class="btn-mini" type="button">Ganti email</button>
-        <button id="btnResend" class="btn-mini" type="button">Kirim ulang kode</button>
+        <button id="btnBack" class="btn-mini" type="button">Kembali ke password</button>
+        <button id="btnResend" class="btn-mini" type="button">Kirim ulang tautan</button>
       </div>
-      <div class="login-hint">Bisa juga dengan mengetuk tautan di email itu, asalkan dibuka di browser yang sama dengan halaman ini.</div>
     </div>
     <div id="loginMsg" class="login-msg" role="status" aria-live="polite"></div>
   </form>
@@ -1646,7 +1649,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   $('loginForm').addEventListener('submit', onLoginSubmit);
   $('btnBack').addEventListener('click', () => setLoginStep('email'));
-  $('btnResend').addEventListener('click', () => { setLoginStep('email'); onLoginSubmit(new Event('submit')); });
+  $('btnResend').addEventListener('click', () => sendMagicLink(loginEmail));
+  $('btnMagic').addEventListener('click', () => sendMagicLink($('loginEmail').value.trim().toLowerCase()));
   $('btnLogout').addEventListener('click', signOutAndReload);
 
   initAuth();
@@ -1700,19 +1704,40 @@ function showLogin() {
   $('login').hidden = false;
   setLoginStep('email');
   setTimeout(() => $('loginEmail').focus(), 50);
+  try { const last = storeGet('stockSnaDss.lastEmail'); if (last) $('loginEmail').value = last; } catch (e) { /* abaikan */ }
 }
 function setLoginStep(step) {
   $('stepEmail').hidden = step !== 'email';
   $('stepCode').hidden = step !== 'code';
   setLoginMsg('');
-  if (step === 'code') { $('codeEmail').textContent = loginEmail; $('loginCode').value = ''; setTimeout(() => $('loginCode').focus(), 50); }
+  if (step === 'code') { $('codeEmail').textContent = loginEmail; $('loginCode').value = ''; }
 }
 function setLoginMsg(text, cls = '') { const m = $('loginMsg'); m.className = 'login-msg ' + cls; m.textContent = text; }
+function passwordErrorText(err) {
+  const m = String((err && err.message) || err || '');
+  if (/invalid login credentials|invalid.*password/i.test(m)) return 'Email atau password salah.';
+  if (/email not confirmed/i.test(m)) return 'Email belum dikonfirmasi. Konfirmasi pengguna ini di Supabase (Authentication → Users).';
+  if (/rate limit|too many/i.test(m)) return 'Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.';
+  return 'Gagal login: ' + m;
+}
+// Cadangan saat lupa password: kirim tautan login (magic link) memakai template email bawaan Supabase.
+async function sendMagicLink(email) {
+  if (!sb) return;
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email || '')) { setLoginStep('email'); setLoginMsg('Isi email Anda dulu, lalu ketuk lagi.', 'err'); return; }
+  setLoginMsg('Mengirim tautan…');
+  try {
+    const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: location.origin + location.pathname } });
+    if (error) { setLoginMsg(otpErrorText(error), 'err'); return; }
+    loginEmail = email;
+    setLoginStep('code');
+    setLoginMsg('Tautan terkirim. Cek kotak masuk dan folder spam.', 'ok');
+  } catch (err) { setLoginMsg(otpErrorText(err), 'err'); }
+}
 function otpErrorText(err) {
   const m = String((err && err.message) || err || '');
   if (/signups not allowed|not allowed for otp|user not found|not found/i.test(m)) return 'Email ini belum terdaftar sebagai pengguna dashboard.';
-  if (/rate limit|too many|security purposes|seconds/i.test(m)) return 'Terlalu banyak permintaan kode. Tunggu sekitar satu menit lalu coba lagi.';
-  return 'Gagal mengirim kode: ' + m;
+  if (/rate limit|too many|security purposes|seconds/i.test(m)) return 'Terlalu banyak permintaan email. Tunggu beberapa menit lalu coba lagi.';
+  return 'Gagal mengirim email: ' + m;
 }
 async function onLoginSubmit(e) {
   if (e && e.preventDefault) e.preventDefault();
@@ -1722,15 +1747,17 @@ async function onLoginSubmit(e) {
   if (btn.disabled) return;
   if (sending) {
     const email = $('loginEmail').value.trim().toLowerCase();
+    const password = $('loginPass').value;
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { setLoginMsg('Format email belum benar.', 'err'); return; }
-    btn.disabled = true; setLoginMsg('Mengirim kode…');
+    if (!password) { setLoginMsg('Isi password Anda.', 'err'); return; }
+    btn.disabled = true; setLoginMsg('Memeriksa akses…');
     try {
-      const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: location.origin + location.pathname } });
-      if (error) { setLoginMsg(otpErrorText(error), 'err'); return; }
-      loginEmail = email;
-      setLoginStep('code');
-      setLoginMsg('Kode terkirim. Cek kotak masuk dan folder spam.', 'ok');
-    } catch (err) { setLoginMsg(otpErrorText(err), 'err'); }
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) { setLoginMsg(passwordErrorText(error), 'err'); return; }
+      storeSet('stockSnaDss.lastEmail', email);
+      setLoginMsg('Akses diterima.', 'ok');
+      if (data && data.session) enterApp(data.session);
+    } catch (err) { setLoginMsg('Gagal login: ' + ((err && err.message) || err), 'err'); }
     finally { btn.disabled = false; }
   } else {
     const token = $('loginCode').value.replace(/\s+/g, '');
