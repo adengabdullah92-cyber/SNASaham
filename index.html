@@ -300,6 +300,21 @@ table.hud { width: 100%; border-collapse: collapse; font-variant-numeric: tabula
 @media (max-width: 900px) { .perf-tables { grid-template-columns: minmax(0, 1fr); } }
 .hud.sm td { padding: 6px 8px; font-size: 12px; }
 .factors-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.spark { display: grid; gap: 6px; }
+.spark-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.spark-box { position: relative; border: 1px solid var(--line-soft); background: rgba(4, 12, 20, .6); }
+.spark-box svg { display: block; width: 100%; height: 132px; }
+.spark-y { position: absolute; left: 6px; font-family: var(--font-mono); font-size: 10px; color: var(--muted); pointer-events: none; }
+.spark-y.top { top: 4px; } .spark-y.bot { bottom: 4px; }
+.spark-15 { position: absolute; top: 4px; right: 6px; font-size: 9.5px; letter-spacing: .14em; color: var(--buy); pointer-events: none; }
+.spark-x { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); }
+.spark-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px; }
+.spark-legend span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.spark-legend i { width: 16px; height: 0; border-top: 2px solid var(--lc); }
+.spark-legend i.dash { border-top-style: dashed; }
+.spark-legend i.dot { border-top-style: dotted; border-top-width: 3px; }
+.spark-legend b { font-family: var(--font-mono); font-weight: 600; }
+.spark-empty { font-size: 12px; color: var(--muted); border: 1px dashed var(--line-soft); padding: 10px; }
 .cl-chip { display: inline-flex; align-items: center; height: 19px; padding: 0 6px; font-family: var(--font-mono); font-size: 11px; font-weight: 600;
   color: var(--cc, var(--muted)); border: 1px solid var(--cc, var(--line)); background: rgba(255, 255, 255, .03); white-space: nowrap; }
 .cl-chip.none { color: var(--muted); border-style: dashed; border-color: var(--line); }
@@ -874,7 +889,8 @@ function normalizePayload(p) {
       day_return_pct: optNum(s.day_return_pct), atr_pct: optNum(s.atr_pct),
       cluster: typeof s.cluster === 'string' ? s.cluster : null, cluster_size: optNum(s.cluster_size) ?? 1,
       peer_return_15m: optNum(s.peer_return_15m), peer_beta: optNum(s.peer_beta), peer_z: optNum(s.peer_z),
-      centrality: optNum(s.centrality), lead_score: optNum(s.lead_score)
+      centrality: optNum(s.centrality), lead_score: optNum(s.lead_score),
+      spark: Array.isArray(s.spark) ? s.spark.map(optNum) : null
     };
   });
   let ts = new Date(p.timestamp); if (isNaN(ts.getTime())) ts = new Date();
@@ -885,7 +901,9 @@ function normalizePayload(p) {
     market_open: typeof p.market_open === 'boolean' ? p.market_open : getMarketStatus().open,
     fresh: typeof p.fresh === 'boolean' ? p.fresh : true,
     benchmark: { ticker: typeof b.ticker === 'string' ? b.ticker.toUpperCase() : BENCHMARK, return_15m: toNum(b.return_15m), price: optNum(b.price), volume: optNum(b.volume),
-      vwap_dist_pct: optNum(b.vwap_dist_pct) },
+      vwap_dist_pct: optNum(b.vwap_dist_pct),
+      spark: Array.isArray(b.spark) ? b.spark.map(optNum) : null,
+      spark_start: typeof b.spark_start === 'string' && !isNaN(Date.parse(b.spark_start)) ? b.spark_start : null },
     minutes_since_open: optNum(p.minutes_since_open),
     network: normalizeNetwork(p.network),
     stocks,
@@ -934,6 +952,20 @@ function mockStock(b, qqq, z) {
     rvol: rnd(rand(0.5, 2.6), 2), vwap_dist_pct: rnd(rand(-0.4, 0.5), 3), gap_pct: rnd(rand(-1.2, 1.5), 3),
     day_return_pct: rnd(rand(-1, 1.6), 3), atr_pct: rnd(atr / price * 100, 3)
   }, mockLevels(price, atr));
+}
+// Jejak harga simulasi 24 bar: QQQ acak dengan 3 bar terakhir sesuai return 15m; saham = β × QQQ + derau,
+// lalu 3 bar terakhir disesuaikan agar cocok dengan return_15m saham.
+function mockSparks(qqq, stocks) {
+  const n = 24, q = [0];
+  for (let i = 1; i < n - 3; i++) q.push(q[i - 1] + rand(-0.09, 0.1));
+  for (let i = n - 3; i < n; i++) q.push(q[i - 1] + qqq / 3);
+  stocks.forEach((s) => {
+    const sp = [0];
+    for (let i = 1; i < n - 3; i++) sp.push(sp[i - 1] + (q[i] - q[i - 1]) * (s.beta || 1) + rand(-0.06, 0.06));
+    for (let i = n - 3; i < n; i++) sp.push(sp[i - 1] + s.return_15m / 3);
+    s.spark = sp.map((v) => rnd(v, 3));
+  });
+  return q.map((v) => rnd(v, 3));
 }
 // Jaringan simulasi: semikonduktor & mega-cap software sebagai dua klaster, SMCI sendirian.
 function mockNetwork(stocks) {
@@ -995,10 +1027,12 @@ function fallbackMockData() {
   }
   if (Math.random() < 0.3) stocks[3].correlation = rnd(rand(-0.4, 0.2), 2);
   const network = mockNetwork(stocks);
+  const qSpark = mockSparks(qqq, stocks);
   const now = new Date().toISOString();
   return normalizePayload({
     timestamp: now, generated_at: now, market_open: getMarketStatus().open, fresh: true,
-    benchmark: { ticker: BENCHMARK, return_15m: rnd(qqq, 2), price: rnd(512 * (1 + rand(-0.005, 0.005)), 2), volume: Math.round(rand(2e6, 6e6)), vwap_dist_pct: rnd(rand(-0.3, 0.4), 3) },
+    benchmark: { ticker: BENCHMARK, return_15m: rnd(qqq, 2), price: rnd(512 * (1 + rand(-0.005, 0.005)), 2), volume: Math.round(rand(2e6, 6e6)), vwap_dist_pct: rnd(rand(-0.3, 0.4), 3),
+      spark: qSpark, spark_start: new Date(Math.floor(Date.now() / 300000) * 300000 - 23 * 300000).toISOString() },
     minutes_since_open: Math.round(rand(20, 370)),
     network, stocks, skipped: [],
     config: { qqq_min_return: 0.2, corr_min: 0.75, z_lag: 1, z_divergent: 3, sl_atr: 1.5, tp_atr: 2.5, sl_pct: 0.9, tp_pct: 1.5, hold_max_min: 60 }
@@ -1522,6 +1556,54 @@ function renderSignals(rows) {
 /* =====================================================================
  *  TARGET LOCK
  * ===================================================================== */
+// Grafik jejak ~2 jam: saham vs QQQ, ekspektasi β × QQQ, dan keranjang klaster (rata-rata anggota lain).
+function sparkHtml(s) {
+  const b = state.data.benchmark;
+  const q = b.spark, sp = s.spark;
+  if (!Array.isArray(q) || !Array.isArray(sp) || q.length < 4 || sp.length !== q.length) {
+    return '<div class="spark-empty">Grafik jejak harga muncul setelah sesi hari ini punya minimal 4 bar (sekitar 20 menit setelah pembukaan).</div>';
+  }
+  const n = q.length, meta = SIGNALS[s.signal];
+  const beta = isNum(s.beta) ? s.beta : 1;
+  const lines = [
+    { label: 'β × QQQ', color: '#9fb7c4', vals: q.map((v) => (isNum(v) ? v * beta : null)), dash: '4 4', cls: 'dash', w: 1.5 },
+    { label: 'QQQ', color: COLORS.cyan, vals: q, w: 1.5 }
+  ];
+  const cl = s.cluster && state.data.network ? state.data.network.clusters.find((c) => c.id === s.cluster) : null;
+  if (cl) {
+    const peers = state.data.stocks.filter((o) => cl.members.includes(o.ticker) && o.ticker !== s.ticker && Array.isArray(o.spark) && o.spark.length === n);
+    if (peers.length) {
+      const basket = q.map((_, i) => { const xs = peers.map((o) => o.spark[i]).filter(isNum); return xs.length ? xs.reduce((a, c) => a + c, 0) / xs.length : null; });
+      lines.push({ label: 'Klaster ' + cl.id, color: clusterColor(cl.id) || COLORS.muted, vals: basket, dash: '1.5 3.5', cls: 'dot', w: 2 });
+    }
+  }
+  lines.push({ label: s.ticker, color: meta.color === COLORS.neu ? COLORS.text : meta.color, vals: sp, w: 2.6 });
+  const all = lines.flatMap((l) => l.vals).filter(isNum).concat([0]);
+  let lo = Math.min(...all), hi = Math.max(...all);
+  const pad = Math.max(0.05, (hi - lo) * 0.12); lo -= pad; hi += pad;
+  const W = 300, H = 120;
+  const x = (i) => (i / (n - 1)) * W;
+  const y = (v) => H - ((v - lo) / (hi - lo)) * H;
+  const path = (vals) => { let d = '', pen = false; vals.forEach((v, i) => { if (!isNum(v)) { pen = false; return; } d += (pen ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1) + ' '; pen = true; }); return d; };
+  const last = (vals) => { for (let i = vals.length - 1; i >= 0; i--) if (isNum(vals[i])) return vals[i]; return null; };
+  const svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-label="Jejak harga ' + escapeHtml(s.ticker) + ' dibanding QQQ">' +
+    '<rect x="' + x(n - 4).toFixed(1) + '" y="0" width="' + (x(n - 1) - x(n - 4)).toFixed(1) + '" height="' + H + '" fill="rgba(255,182,39,0.08)"/>' +
+    '<line x1="' + x(n - 4).toFixed(1) + '" x2="' + x(n - 4).toFixed(1) + '" y1="0" y2="' + H + '" stroke="rgba(255,182,39,0.35)" stroke-dasharray="2 3" vector-effect="non-scaling-stroke"/>' +
+    '<line x1="0" x2="' + W + '" y1="' + y(0).toFixed(1) + '" y2="' + y(0).toFixed(1) + '" stroke="rgba(111,147,166,0.55)" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>' +
+    lines.map((l) => '<path d="' + path(l.vals) + '" fill="none" stroke="' + l.color + '" stroke-width="' + l.w + '"' + (l.dash ? ' stroke-dasharray="' + l.dash + '"' : '') +
+      ' stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"' + (l.label === s.ticker ? ' style="filter:drop-shadow(0 0 3px ' + l.color + ')"' : '') + '/>').join('') +
+    '</svg>';
+  const start = b.spark_start ? new Date(b.spark_start) : null;
+  const end = start ? new Date(start.getTime() + (n - 1) * 300000) : null;
+  return '<div class="spark">' +
+    '<div class="spark-head"><span class="label">Jejak harga · sesi hari ini</span><span class="calib-hint">' + n + ' bar · return kumulatif sejak awal jendela</span></div>' +
+    '<div class="spark-box">' + svg +
+      '<span class="spark-y top">' + fmtPct(hi, 2) + '</span><span class="spark-y bot">' + fmtPct(lo, 2) + '</span><span class="spark-15">15M</span></div>' +
+    (start ? '<div class="spark-x"><span>' + fmtWibTime(start, false) + ' WIB</span><span>' + fmtWibTime(end, false) + ' WIB</span></div>' : '') +
+    '<div class="spark-legend">' + lines.slice().reverse().map((l) => '<span><i class="' + (l.cls || '') + '" style="--lc:' + l.color + '"></i>' + escapeHtml(l.label) +
+      ' <b class="' + pctClass(last(l.vals)) + '">' + fmtPct(last(l.vals)) + '</b></span>').join('') + '</div>' +
+  '</div>';
+}
 function lockNetwork(s) {
   const net = state.data.network;
   const cl = s.cluster && net ? net.clusters.find((c) => c.id === s.cluster) : null;
@@ -1583,6 +1665,7 @@ function renderLock(rows, animate) {
           '<span style="left:' + ((pB + 100) / 2) + '%;color:var(--mom)">MOMENTUM</span></div>' +
         (qqqOk ? '' : '<div class="znote">Zona z hanya berlaku saat QQQ naik &gt; +' + cfg.qqqThreshold.toFixed(2) + '% dan r ≥ ' + cfg.corrThreshold.toFixed(2) + '.</div>') +
       '</div>' +
+      sparkHtml(s) +
       '<div class="statgrid">' +
         '<div class="stat"><span class="label">Korelasi r</span><b>' + s.correlation.toFixed(3) + '</b><small>' + (isNum(s.corr_samples) ? 'n=' + s.corr_samples : '') + '</small></div>' +
         '<div class="stat"><span class="label">Beta <span class="nc">β</span></span><b>' + fmtNum(s.beta) + '</b></div>' +
