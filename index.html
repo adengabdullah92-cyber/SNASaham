@@ -158,7 +158,7 @@ button, input { font: inherit; color: inherit; }
 /* ---------- KERANGKA ---------- */
 main { position: relative; z-index: 1; display: grid; gap: 16px; padding-block: 16px 28px;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); max-width: 1500px; margin: 0 auto; }
-.grid-top { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); gap: 16px; }
+.grid-top { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 @media (max-width: 1000px) { .grid-top { grid-template-columns: minmax(0, 1fr); } }
 
 .panel { position: relative; min-width: 0; padding: 1px; background: linear-gradient(160deg, var(--line), rgba(63, 224, 255, .08) 45%, rgba(232, 193, 112, .28));
@@ -300,6 +300,27 @@ table.hud { width: 100%; border-collapse: collapse; font-variant-numeric: tabula
 @media (max-width: 900px) { .perf-tables { grid-template-columns: minmax(0, 1fr); } }
 .hud.sm td { padding: 6px 8px; font-size: 12px; }
 .factors-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.cl-chip { display: inline-flex; align-items: center; height: 19px; padding: 0 6px; font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  color: var(--cc, var(--muted)); border: 1px solid var(--cc, var(--line)); background: rgba(255, 255, 255, .03); white-space: nowrap; }
+.cl-chip.none { color: var(--muted); border-style: dashed; border-color: var(--line); }
+.net-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 16px; align-items: start; }
+@media (max-width: 1000px) { .net-grid { grid-template-columns: minmax(0, 1fr); } }
+.cl-list { display: grid; gap: 10px; }
+.cl-card { border: 1px solid var(--line-soft); border-left: 3px solid var(--cc); background: rgba(10, 26, 39, .55); padding: 10px 12px; display: grid; gap: 8px; }
+.cl-card-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cl-card-top b { font-size: 15px; letter-spacing: .12em; color: var(--cc); }
+.cl-members { display: flex; gap: 6px; flex-wrap: wrap; }
+.cl-member { font-family: var(--font-display); font-weight: 700; letter-spacing: .06em; font-size: 12.5px; padding: 1px 7px; border: 1px solid var(--line-soft); cursor: pointer; background: transparent; color: var(--text); }
+.cl-member:hover { border-color: var(--cc); }
+.cl-member.lead::after { content: " ▲"; color: var(--gold); font-size: 10px; }
+.cl-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.heat-wrap { overflow-x: auto; }
+table.heat { border-collapse: separate; border-spacing: 2px; font-family: var(--font-mono); font-size: 11.5px; margin: 0 auto; }
+.heat th { font-family: var(--font-display); font-weight: 700; font-size: 11px; letter-spacing: .06em; padding: 2px 4px; color: var(--muted); white-space: nowrap; }
+.heat th.rowh { text-align: right; }
+.heat td { width: 44px; height: 30px; text-align: center; color: var(--text); font-variant-numeric: tabular-nums; }
+.heat td.self { color: var(--muted); }
+.heat-legend { display: flex; justify-content: center; gap: 12px; font-size: 10.5px; color: var(--muted); margin-top: 6px; flex-wrap: wrap; }
 .factor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 12px; }
 .factor { border: 1px solid var(--line-soft); background: rgba(10, 26, 39, .55); padding: 10px 12px; display: grid; gap: 2px; min-width: 0; }
 .factor h3 { margin: 0 0 4px; font-size: 11px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--gold); }
@@ -468,6 +489,7 @@ footer.disc { font-size: 11.5px; color: var(--muted); max-width: 95ch; }
           <span class="lg"><i style="background:var(--avoid)"></i>AVOID</span>
           <span class="lg"><i style="background:var(--neu)"></i>NEUTRAL</span>
           <span class="lg"><i style="background:none;border:1px dashed var(--gold);border-radius:50%"></i>ambang r</span>
+          <label class="toggle" for="netToggle"><input type="checkbox" id="netToggle" checked><span></span>JARINGAN</label>
           <button id="btnResetView" class="btn-mini" type="button">Reset view</button>
         </div>
       </div>
@@ -490,13 +512,32 @@ footer.disc { font-size: 11.5px; color: var(--muted); max-width: 95ch; }
         <table class="hud">
           <thead><tr>
             <th>Ticker</th><th class="r">Harga</th><th class="r">r</th><th class="r nc">β</th><th class="r">Ret 15m</th><th class="r">Ekspektasi</th>
-            <th class="r">Lag z</th><th class="r">Vol 15m</th><th>Sinyal</th><th class="r">SL / TP</th>
+            <th class="r">Lag z</th><th>Klaster</th><th class="r">z klaster</th><th class="r">Vol 15m</th><th>Sinyal</th><th class="r">SL / TP</th>
           </tr></thead>
           <tbody id="signalBody"></tbody>
         </table>
       </div>
       <div id="signalCards" class="cards"></div>
       <div id="skippedNote" class="skipped"></div>
+    </div>
+  </section>
+
+  <!-- JARINGAN ANTAR-SAHAM -->
+  <section class="panel">
+    <div class="panel-body">
+      <div class="panel-head"><span class="tag">SNA</span><h2>Jaringan Antar-Saham</h2><span class="meta" id="netMeta"></span></div>
+      <div class="net-grid">
+        <div>
+          <div class="label" style="margin-bottom:8px">Klaster <span class="nc">· saham yang bergerak bersama</span></div>
+          <div id="clusterList" class="cl-list"></div>
+        </div>
+        <div>
+          <div class="label" style="margin-bottom:8px">Matriks korelasi return 5 menit</div>
+          <div class="heat-wrap"><table class="heat" id="heatmap"></table></div>
+          <div class="heat-legend"><span>■ <span style="color:#3fe0ff">cyan</span> = bergerak searah</span><span>■ <span style="color:#ff4d6a">merah</span> = berlawanan</span><span>makin pekat = makin kuat</span></div>
+        </div>
+      </div>
+      <div class="calib-hint">▲ = pemimpin klaster (lead score tertinggi: geraknya cenderung mendahului yang lain 5 menit kemudian). Lag terhadap klaster dicatat sebagai faktor, belum mengubah aturan alert.</div>
     </div>
   </section>
 
@@ -604,6 +645,17 @@ const COLORS = { cyan: '#3fe0ff', gold: '#e8c170', text: '#d6f4ff', muted: '#6f9
 const CANVAS_FONT = '"Chakra Petch", "Segoe UI", system-ui, sans-serif';
 const CANVAS_MONO = '"JetBrains Mono", ui-monospace, Menlo, monospace';
 
+const CLUSTER_COLORS = ['#e8c170', '#ff7ad9', '#9ab8ff', '#ff9f5a', '#7ef0c8', '#c9a7ff'];
+function clusterColor(id) {
+  if (!id || !state.data || !state.data.network) return null;
+  const i = state.data.network.clusters.findIndex((c) => c.id === id);
+  return i < 0 ? null : CLUSTER_COLORS[i % CLUSTER_COLORS.length];
+}
+function clChip(id) {
+  const c = clusterColor(id);
+  return c ? '<span class="cl-chip" style="--cc:' + c + '">' + escapeHtml(id) + '</span>' : '<span class="cl-chip none">solo</span>';
+}
+function leadText(v) { return !isNum(v) ? '-' : v > 0.05 ? 'cenderung memimpin' : v < -0.05 ? 'cenderung mengikuti' : 'netral'; }
 const SIGNALS = {
   BUY_LAGGING: { label: 'BUY LAGGING', short: 'BUY', color: COLORS.buy,   order: 0 },
   MOMENTUM:    { label: 'MOMENTUM',    short: 'MOM', color: COLORS.mom,   order: 1 },
@@ -624,7 +676,7 @@ const state = {
   history: { rows: [], total: null, mode: 'simulation', error: null },
   perf: { rows: [], mode: 'simulation', error: null },
   rows: [], positions: {}, prevSignals: null, acquire: {}, prevVals: {},
-  booting: false, pendingAcquire: false, appStarted: false
+  booting: false, pendingAcquire: false, appStarted: false, showNet: true
 };
 let sb = null;            // klien Supabase Auth (hanya jika login diwajibkan)
 let network = null, nodesDS = null, edgesDS = null, userMovedView = false;
@@ -819,7 +871,10 @@ function normalizePayload(p) {
       atr: optNum(s.atr), stop_loss: optNum(s.stop_loss), take_profit: optNum(s.take_profit),
       sl_method: s.sl_method === 'ATR' || s.sl_method === 'PCT' ? s.sl_method : null,
       rvol: optNum(s.rvol), vwap_dist_pct: optNum(s.vwap_dist_pct), gap_pct: optNum(s.gap_pct),
-      day_return_pct: optNum(s.day_return_pct), atr_pct: optNum(s.atr_pct)
+      day_return_pct: optNum(s.day_return_pct), atr_pct: optNum(s.atr_pct),
+      cluster: typeof s.cluster === 'string' ? s.cluster : null, cluster_size: optNum(s.cluster_size) ?? 1,
+      peer_return_15m: optNum(s.peer_return_15m), peer_beta: optNum(s.peer_beta), peer_z: optNum(s.peer_z),
+      centrality: optNum(s.centrality), lead_score: optNum(s.lead_score)
     };
   });
   let ts = new Date(p.timestamp); if (isNaN(ts.getTime())) ts = new Date();
@@ -832,11 +887,25 @@ function normalizePayload(p) {
     benchmark: { ticker: typeof b.ticker === 'string' ? b.ticker.toUpperCase() : BENCHMARK, return_15m: toNum(b.return_15m), price: optNum(b.price), volume: optNum(b.volume),
       vwap_dist_pct: optNum(b.vwap_dist_pct) },
     minutes_since_open: optNum(p.minutes_since_open),
+    network: normalizeNetwork(p.network),
     stocks,
     skipped: Array.isArray(p.skipped) ? p.skipped.filter((x) => x && typeof x.ticker === 'string').map((x) => ({ ticker: x.ticker, reason: String(x.reason || '') })) : [],
     config: c ? { qqq: optNum(c.qqq_min_return), corr: optNum(c.corr_min), zLag: optNum(c.z_lag), zDiv: optNum(c.z_divergent),
-      slAtr: optNum(c.sl_atr), tpAtr: optNum(c.tp_atr), sl: optNum(c.sl_pct), tp: optNum(c.tp_pct), holdMax: optNum(c.hold_max_min) } : null
+      slAtr: optNum(c.sl_atr), tpAtr: optNum(c.tp_atr), sl: optNum(c.sl_pct), tp: optNum(c.tp_pct), holdMax: optNum(c.hold_max_min),
+      peerCorrMin: optNum(c.peer_corr_min), clusterR: optNum(c.cluster_r) } : null
   };
+}
+function normalizeNetwork(n) {
+  const empty = { tickers: [], matrix: [], edges: [], clusters: [] };
+  if (!n || typeof n !== 'object' || !Array.isArray(n.tickers)) return empty;
+  const tickers = n.tickers.filter((t) => typeof t === 'string').map((t) => t.toUpperCase());
+  const matrix = Array.isArray(n.matrix) ? n.matrix.map((row) => Array.isArray(row) ? row.map(optNum) : []) : [];
+  const edges = Array.isArray(n.edges) ? n.edges.filter((e) => e && typeof e.a === 'string' && typeof e.b === 'string' && isNum(toNum(e.r)))
+    .map((e) => ({ a: e.a.toUpperCase(), b: e.b.toUpperCase(), r: toNum(e.r) })) : [];
+  const clusters = Array.isArray(n.clusters) ? n.clusters.filter((c) => c && typeof c.id === 'string' && Array.isArray(c.members))
+    .map((c) => ({ id: c.id, members: c.members.filter((m) => typeof m === 'string').map((m) => m.toUpperCase()), avg_r: optNum(c.avg_r),
+      avg_return_15m: optNum(c.avg_return_15m), leader: typeof c.leader === 'string' ? c.leader.toUpperCase() : null })) : [];
+  return { tickers, matrix, edges, clusters };
 }
 async function fetchLiveDataFromSupabase() {
   const { json } = await fetchJsonTimeout(SUPABASE_FUNCTION_URL, { method: 'GET', headers: await authHeaders() });
@@ -866,6 +935,45 @@ function mockStock(b, qqq, z) {
     day_return_pct: rnd(rand(-1, 1.6), 3), atr_pct: rnd(atr / price * 100, 3)
   }, mockLevels(price, atr));
 }
+// Jaringan simulasi: semikonduktor & mega-cap software sebagai dua klaster, SMCI sendirian.
+function mockNetwork(stocks) {
+  const groups = { NVDA: 'A', AMD: 'A', TSM: 'A', MSFT: 'B', META: 'B', AMZN: 'B' };
+  const tickers = stocks.map((s) => s.ticker);
+  const matrix = tickers.map(() => tickers.map(() => null));
+  tickers.forEach((a, i) => tickers.forEach((b, j) => {
+    if (j < i) return;
+    const r = i === j ? 1 : (groups[a] && groups[a] === groups[b]) ? rand(0.76, 0.93) : (groups[a] && groups[b]) ? rand(0.45, 0.66) : rand(0.15, 0.5);
+    matrix[i][j] = matrix[j][i] = rnd(r, 3);
+  }));
+  const edges = [];
+  tickers.forEach((a, i) => tickers.forEach((b, j) => { if (j > i && matrix[i][j] >= 0.6) edges.push({ a, b, r: matrix[i][j] }); }));
+  const clusters = [];
+  ['A', 'B'].forEach((g, gi) => {
+    const members = tickers.filter((t) => groups[t] === g).sort();
+    const ms = stocks.filter((s) => groups[s.ticker] === g);
+    ms.forEach((s) => {
+      const others = ms.filter((o) => o !== s);
+      s.cluster = 'K' + (gi + 1); s.cluster_size = members.length;
+      s.peer_return_15m = rnd(others.reduce((a, o) => a + o.return_15m, 0) / others.length, 4);
+      s.peer_beta = rnd(rand(0.8, 1.2), 3);
+      s.peer_z = rnd(s.lag_z * rand(0.6, 1.2) + rand(-0.5, 0.5), 2);
+    });
+    let pairs = [];
+    members.forEach((a, i) => members.forEach((b, j) => { if (j > i) pairs.push(matrix[tickers.indexOf(a)][tickers.indexOf(b)]); }));
+    clusters.push({ id: 'K' + (gi + 1), members, avg_r: rnd(pairs.reduce((a, b) => a + b, 0) / pairs.length, 3),
+      avg_return_15m: rnd(ms.reduce((a, s) => a + s.return_15m, 0) / ms.length, 4), leader: null });
+  });
+  stocks.forEach((s, i) => {
+    s.centrality = rnd(matrix[i].filter((_, j) => j !== i).reduce((a, b) => a + Math.abs(b), 0) / (tickers.length - 1), 3);
+    s.lead_score = rnd(rand(-0.18, 0.18), 3);
+    if (!s.cluster) { s.cluster = null; s.cluster_size = 1; s.peer_return_15m = null; s.peer_beta = null; s.peer_z = null; }
+  });
+  clusters.forEach((c) => {
+    const ms = stocks.filter((s) => c.members.includes(s.ticker)).sort((a, b) => b.lead_score - a.lead_score);
+    c.leader = ms.length ? ms[0].ticker : null;
+  });
+  return { tickers, matrix, edges, clusters };
+}
 function fallbackMockData() {
   const base = [
     { ticker: 'NVDA', corr: 0.88, beta: 1.8, sig: 0.28, price: 145.20 },
@@ -886,12 +994,13 @@ function fallbackMockData() {
     stocks[i] = mockStock(Object.assign({}, base[i], { corr: 0.9 }), qqq, -(cfg.zLag + 0.4));
   }
   if (Math.random() < 0.3) stocks[3].correlation = rnd(rand(-0.4, 0.2), 2);
+  const network = mockNetwork(stocks);
   const now = new Date().toISOString();
   return normalizePayload({
     timestamp: now, generated_at: now, market_open: getMarketStatus().open, fresh: true,
     benchmark: { ticker: BENCHMARK, return_15m: rnd(qqq, 2), price: rnd(512 * (1 + rand(-0.005, 0.005)), 2), volume: Math.round(rand(2e6, 6e6)), vwap_dist_pct: rnd(rand(-0.3, 0.4), 3) },
     minutes_since_open: Math.round(rand(20, 370)),
-    stocks, skipped: [],
+    network, stocks, skipped: [],
     config: { qqq_min_return: 0.2, corr_min: 0.75, z_lag: 1, z_divergent: 3, sl_atr: 1.5, tp_atr: 2.5, sl_pct: 0.9, tp_pct: 1.5, hold_max_min: 60 }
   });
 }
@@ -910,7 +1019,8 @@ function normalizeLog(r) {
     blocked: r.blocked === true, alert_sent: r.alert_sent === true, outcome: OUTCOME[oc] ? oc : null,
     return_pct: optNum(r.return_pct), mfe_pct: optNum(r.mfe_pct), mae_pct: optNum(r.mae_pct), bars_held: optNum(r.bars_held),
     rvol: optNum(r.rvol), vwap_dist_pct: optNum(r.vwap_dist_pct), qqq_vwap_dist_pct: optNum(r.qqq_vwap_dist_pct),
-    minutes_since_open: optNum(r.minutes_since_open), gap_pct: optNum(r.gap_pct), day_return_pct: optNum(r.day_return_pct), atr_pct: optNum(r.atr_pct)
+    minutes_since_open: optNum(r.minutes_since_open), gap_pct: optNum(r.gap_pct), day_return_pct: optNum(r.day_return_pct), atr_pct: optNum(r.atr_pct),
+    cluster_id: typeof r.cluster_id === 'string' ? r.cluster_id : null, cluster_size: optNum(r.cluster_size), peer_z: optNum(r.peer_z), lead_score: optNum(r.lead_score)
   };
 }
 async function fetchSignalHistory() {
@@ -922,7 +1032,7 @@ async function fetchSignalHistory() {
 }
 async function fetchPerformance() {
   const cols = 'ticker,ai_status,blocked,alert_sent,outcome,return_pct,mfe_pct,mae_pct,bars_held,created_at,lag_z,' +
-    'rvol,vwap_dist_pct,qqq_vwap_dist_pct,minutes_since_open,gap_pct,day_return_pct,atr_pct';
+    'rvol,vwap_dist_pct,qqq_vwap_dist_pct,minutes_since_open,gap_pct,day_return_pct,atr_pct,cluster_id,cluster_size,peer_z,lead_score';
   const url = SUPABASE_URL + '/rest/v1/signal_logs?select=' + cols + '&outcome=in.(TP,SL,TIMEOUT)&order=created_at.desc&limit=' + PERF_LIMIT;
   const { json } = await fetchJsonTimeout(url, { method: 'GET', headers: await authHeaders() });
   if (!Array.isArray(json)) throw new Error('Respons kinerja bukan array');
@@ -957,7 +1067,8 @@ function mockPerformance() {
       outcome: oc, return_pct: rnd(ret, 3), mfe_pct: rnd(Math.max(ret, 0) + rand(0, 0.3), 3), mae_pct: rnd(Math.min(ret, 0) - rand(0, 0.3), 3),
       bars_held: Math.round(rand(1, 12)), created_at: new Date(Date.now() - i * 3600000).toISOString(),
       lag_z: rnd(rand(-2.8, -1.0), 2), rvol: rnd(rand(0.4, 2.8), 2), vwap_dist_pct: rnd(rand(-0.5, 0.5), 3), qqq_vwap_dist_pct: rnd(rand(-0.4, 0.4), 3),
-      minutes_since_open: Math.round(rand(5, 385)), gap_pct: i % 7 === 0 ? null : rnd(rand(-1.5, 1.5), 3), day_return_pct: rnd(rand(-1, 1.5), 3), atr_pct: rnd(rand(0.12, 0.7), 3) }));
+      minutes_since_open: Math.round(rand(5, 385)), gap_pct: i % 7 === 0 ? null : rnd(rand(-1.5, 1.5), 3), day_return_pct: rnd(rand(-1, 1.5), 3), atr_pct: rnd(rand(0.12, 0.7), 3),
+      peer_z: i % 5 === 0 ? null : rnd(rand(-2.5, 1.0), 2), lead_score: rnd(rand(-0.2, 0.2), 3) }));
   }
   return rows;
 }
@@ -1222,6 +1333,27 @@ function drawRadarOverlay(ctx) {
   for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.arc(0, 0, 30 * k, rot + i * Math.PI / 3, rot + i * Math.PI / 3 + 0.7); ctx.stroke(); }
   ctx.lineWidth = 1.5 * k; ctx.strokeStyle = 'rgba(232,193,112,0.85)';
   for (let i = 0; i < 12; i++) { ctx.beginPath(); ctx.arc(0, 0, 38 * k, -rot * 0.6 + i * Math.PI / 6, -rot * 0.6 + i * Math.PI / 6 + 0.18); ctx.stroke(); }
+  // cincin & label klaster
+  if (state.showNet) {
+    const byCl = {};
+    Object.keys(state.positions).forEach((tk) => {
+      const p = state.positions[tk];
+      if (!p.cluster) return;
+      const col = clusterColor(p.cluster); if (!col) return;
+      ctx.beginPath(); ctx.setLineDash([2.5 * k, 3 * k]); ctx.arc(p.x, p.y, 13 * k, 0, Math.PI * 2);
+      ctx.strokeStyle = col; ctx.lineWidth = 1.4 * k; ctx.stroke(); ctx.setLineDash([]);
+      (byCl[p.cluster] = byCl[p.cluster] || []).push(p);
+    });
+    ctx.font = '700 ' + (11 * k).toFixed(2) + 'px ' + CANVAS_FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    Object.keys(byCl).forEach((id) => {
+      const ps = byCl[id];
+      const sx = ps.reduce((a, p) => a + Math.cos(p.angle), 0), sy = ps.reduce((a, p) => a + Math.sin(p.angle), 0);
+      const ang = Math.atan2(sy, sx), Rm = Math.max(...ps.map((p) => p.R)) + 50 * k;
+      ctx.fillStyle = clusterColor(id);
+      ctx.fillText(id, Math.cos(ang) * Rm, Math.sin(ang) * Rm);
+    });
+    ctx.textAlign = 'start';
+  }
   // denyut node BUY
   state.rows.forEach((s) => {
     if (s.signal !== 'BUY_LAGGING') return;
@@ -1276,17 +1408,26 @@ function renderGraph(rows) {
     borderWidth: 2, shadow: { enabled: true, color: 'rgba(63,224,255,0.9)', size: 30, x: 0, y: 0 },
     font: { color: COLORS.gold, size: 14 * k, face: CANVAS_FONT, strokeWidth: 4 * k, strokeColor: COLORS.bg, vadjust: 24 * k }
   });
-  rows.forEach((s, i) => {
+  // Urutan di lingkaran: anggota klaster yang sama berdampingan, dengan celah kecil antar-klaster.
+  const net = state.data.network || { clusters: [], edges: [] };
+  const cIdx = (s) => { const i = net.clusters.findIndex((c) => c.id === s.cluster); return i < 0 ? 99 : i; };
+  const layout = rows.slice().sort((a, b) => cIdx(a) - cIdx(b) || a.ticker.localeCompare(b.ticker));
+  const slots = [];
+  let slot = 0;
+  layout.forEach((s, i) => { if (i > 0 && cIdx(s) !== cIdx(layout[i - 1])) slot += 0.6; slots.push(slot); slot += 1; });
+  const totalSlots = Math.max(slot, 1);
+  layout.forEach((s, i) => {
     const meta = SIGNALS[s.signal];
-    const angle = (2 * Math.PI * i) / Math.max(n, 1) - Math.PI / 2;
+    const angle = (2 * Math.PI * slots[i]) / totalSlots - Math.PI / 2;
     const absR = Math.abs(s.correlation);
     const R = radiusFor(absR);
     const x = Math.cos(angle) * R, y = Math.sin(angle) * R;
     const isBuy = s.signal === 'BUY_LAGGING';
-    state.positions[s.ticker] = { x, y };
+    state.positions[s.ticker] = { x, y, cluster: s.cluster, angle, R };
     nodes.push({
       id: s.ticker, label: s.ticker + '\n' + fmtPct(s.return_15m), x, y, fixed: true, size: (isBuy ? 10 : 7.5) * k,
-      title: tipEl(s.ticker + ' · ' + meta.label, ['r ' + s.correlation.toFixed(2) + '   β ' + fmtNum(s.beta), 'Ret 15m ' + fmtPct(s.return_15m) + '  (eksp ' + fmtPct(s.expected_return) + ')', 'Lag z ' + fmtSigned(s.lag_z)]),
+      title: tipEl(s.ticker + ' · ' + meta.label, ['r ' + s.correlation.toFixed(2) + '   β ' + fmtNum(s.beta), 'Ret 15m ' + fmtPct(s.return_15m) + '  (eksp ' + fmtPct(s.expected_return) + ')', 'Lag z ' + fmtSigned(s.lag_z),
+        s.cluster ? 'Klaster ' + s.cluster + ' · z klaster ' + fmtSigned(s.peer_z) : 'Tidak masuk klaster']),
       color: { background: meta.color, border: 'rgba(255,255,255,0.75)', highlight: { background: meta.color, border: '#fff' }, hover: { background: meta.color, border: '#fff' } },
       borderWidth: isBuy ? 2.5 : 1.5,
       shadow: { enabled: true, color: meta.color, size: isBuy ? 26 : 12, x: 0, y: 0 },
@@ -1294,9 +1435,25 @@ function renderGraph(rows) {
     });
     edges.push({
       id: 'e-' + s.ticker, from: BENCHMARK, to: s.ticker, width: (0.8 + absR * 2.6) * k, dashes: s.correlation < 0 ? [5 * k, 6 * k] : false,
-      color: { color: meta.color, highlight: meta.color, hover: meta.color, opacity: s.signal === 'NEUTRAL' ? 0.35 : 0.7 }
+      color: { color: meta.color, highlight: meta.color, hover: meta.color, opacity: s.signal === 'NEUTRAL' ? 0.35 : (state.showNet ? 0.45 : 0.7) }
     });
   });
+  // Garis antar-saham (korelasi >= PEER_CORR_MIN). Dalam satu klaster: warna klaster; lintas klaster: abu putus-putus.
+  if (state.showNet) {
+    const present = new Set(rows.map((r) => r.ticker));
+    net.edges.forEach((e) => {
+      if (!present.has(e.a) || !present.has(e.b)) return;
+      const ca = state.positions[e.a].cluster, cb = state.positions[e.b].cluster;
+      const same = ca && ca === cb;
+      const col = same ? clusterColor(ca) : 'rgba(150,175,190,0.55)';
+      edges.push({
+        id: 'p-' + e.a + '-' + e.b, from: e.a, to: e.b, width: Math.max(0.6, (e.r - 0.5) * 7) * k,
+        dashes: same ? false : [3 * k, 5 * k], smooth: { enabled: true, type: 'curvedCW', roundness: 0.18 },
+        color: { color: col, highlight: col, hover: col, opacity: same ? 0.85 : 0.4 },
+        title: tipEl(e.a + ' ↔ ' + e.b, ['r = ' + e.r.toFixed(2), same ? 'Satu klaster (' + ca + ')' : 'Lintas klaster'])
+      });
+    });
+  }
   nodesDS.clear(); edgesDS.clear(); nodesDS.add(nodes); edgesDS.add(edges);
   fitRadar();
   if (REDUCED) network.redraw();
@@ -1331,10 +1488,12 @@ function renderSignals(rows) {
       '<td class="r ' + pctClass(s.return_15m) + flashCls(s.ticker, 'ret', s.return_15m) + '">' + fmtPct(s.return_15m) + '</td>' +
       '<td class="r muted">' + fmtPct(s.expected_return) + '</td>' +
       '<td class="r ' + zClass(s.lag_z, state.cfg) + '">' + fmtSigned(s.lag_z) + '</td>' +
+      '<td>' + clChip(s.cluster) + '</td>' +
+      '<td class="r ' + zClass(s.peer_z, state.cfg) + '">' + fmtSigned(s.peer_z) + '</td>' +
       '<td class="r muted">' + fmtVolume(s.volume) + '</td>' +
       '<td><span class="badge b-' + s.signal + '">' + meta.label + '</span></td>' +
       '<td class="r">' + (isBuy && lv ? '<span class="neg">' + lv.sl.toFixed(2) + '</span> / <span class="pos">' + lv.tp.toFixed(2) + '</span>' : '<span class="muted">-</span>') + '</td></tr>';
-  }).join('') || '<tr class="empty-row"><td colspan="10">Tidak ada saham yang lolos perhitungan pada snapshot ini.</td></tr>';
+  }).join('') || '<tr class="empty-row"><td colspan="12">Tidak ada saham yang lolos perhitungan pada snapshot ini.</td></tr>';
 
   $('signalCards').innerHTML = rows.map((s) => {
     const meta = SIGNALS[s.signal], lv = levelsOf(s), isBuy = s.signal === 'BUY_LAGGING';
@@ -1344,7 +1503,7 @@ function renderSignals(rows) {
         '<span>Harga<b class="' + flashCls(s.ticker, 'price', s.price).trim() + '">' + fmtPrice(s.price) + '</b></span>' +
         '<span>Ret 15m<b class="' + pctClass(s.return_15m) + '">' + fmtPct(s.return_15m) + '</b></span>' +
         '<span>Lag z<b class="' + zClass(s.lag_z, state.cfg) + '">' + fmtSigned(s.lag_z) + '</b></span>' +
-        '<span>Ekspektasi<b>' + fmtPct(s.expected_return) + '</b></span>' +
+        '<span>Klaster · z<b>' + (s.cluster ? escapeHtml(s.cluster) + ' · <span class="' + zClass(s.peer_z, state.cfg) + '">' + fmtSigned(s.peer_z) + '</span>' : 'solo') + '</b></span>' +
         '<span>r / <span class="nc">β</span><b>' + s.correlation.toFixed(2) + ' / ' + fmtNum(s.beta) + '</b></span>' +
         '<span>SL / TP<b>' + (isBuy && lv ? lv.sl.toFixed(2) + ' / ' + lv.tp.toFixed(2) : '-') + '</b></span>' +
       '</div></button>';
@@ -1363,6 +1522,20 @@ function renderSignals(rows) {
 /* =====================================================================
  *  TARGET LOCK
  * ===================================================================== */
+function lockNetwork(s) {
+  const net = state.data.network;
+  const cl = s.cluster && net ? net.clusters.find((c) => c.id === s.cluster) : null;
+  const peers = cl ? cl.members.filter((m) => m !== s.ticker).join(', ') : '';
+  return '<div><div class="label" style="margin-bottom:6px">Jaringan <span class="nc">· lag terhadap klaster dicatat, belum jadi filter</span></div>' +
+    '<div class="statgrid">' +
+      '<div class="stat"><span class="label">Klaster</span><b>' + clChip(s.cluster) + '</b><small>' + (peers ? 'dengan ' + escapeHtml(peers) : 'korelasi antar-saham rendah') + '</small></div>' +
+      '<div class="stat"><span class="label">Keranjang 15m</span><b class="' + pctClass(s.peer_return_15m) + '">' + fmtPct(s.peer_return_15m) + '</b><small>rata² anggota lain</small></div>' +
+      '<div class="stat"><span class="label">z klaster</span><b class="' + zClass(s.peer_z, state.cfg) + '">' + fmtSigned(s.peer_z) + '</b><small><span class="nc">β</span> klaster ' + fmtNum(s.peer_beta) + '</small></div>' +
+      '<div class="stat"><span class="label">Centrality</span><b>' + fmtNum(s.centrality) + '</b><small>rata² |r| ke saham lain</small></div>' +
+      '<div class="stat"><span class="label">Lead score</span><b class="' + pctClass(s.lead_score) + '">' + fmtSigned(s.lead_score, 3) + '</b><small>' + leadText(s.lead_score) + '</small></div>' +
+      '<div class="stat"><span class="label">z vs QQQ</span><b class="' + zClass(s.lag_z, state.cfg) + '">' + fmtSigned(s.lag_z) + '</b><small>pembanding</small></div>' +
+    '</div></div>';
+}
 function renderLock(rows, animate) {
   const panel = $('detailPanel');
   const s = rows.find((r) => r.ticker === state.selected);
@@ -1426,10 +1599,60 @@ function renderLock(rows, animate) {
         '<div class="stat"><span class="label">Sejak open</span><b class="' + pctClass(s.day_return_pct) + '">' + fmtPct(s.day_return_pct) + '</b></div>' +
         '<div class="stat"><span class="label">Menit sesi</span><b>' + (isNum(state.data.minutes_since_open) ? state.data.minutes_since_open : '-') + '</b><small>sejak 09:30 ET</small></div>' +
       '</div></div>' +
+      lockNetwork(s) +
       ladder +
       '<p class="explain">' + escapeHtml(explainSignal(s, bench, cfg, s.signal)) + '</p>' +
       (s.signal === 'BUY_LAGGING' ? '<div class="explain-note">Level SL/TP hanya ilustrasi, bukan rekomendasi.</div>' : '') +
     '</div>';
+}
+
+/* =====================================================================
+ *  JARINGAN ANTAR-SAHAM
+ * ===================================================================== */
+function renderNetwork(rows) {
+  const net = state.data.network;
+  const present = new Set(rows.map((r) => r.ticker));
+  if (!net || !net.tickers.length) {
+    $('clusterList').innerHTML = '<div class="muted">Data jaringan belum tersedia dari server (perlu Edge Function v6).</div>';
+    $('heatmap').innerHTML = ''; $('netMeta').textContent = '';
+    return;
+  }
+  const c = state.data.config;
+  $('netMeta').textContent = net.clusters.length + ' klaster · ' + net.edges.length + ' garis r ≥ ' + ((c && c.peerCorrMin) ?? 0.6);
+  const byTk = Object.fromEntries(rows.map((r) => [r.ticker, r]));
+  const solo = rows.filter((r) => !r.cluster).map((r) => r.ticker);
+  $('clusterList').innerHTML = net.clusters.map((cl) => {
+    const col = clusterColor(cl.id);
+    const zs = cl.members.map((m) => byTk[m] && byTk[m].peer_z).filter(isNum);
+    const most = cl.members.filter((m) => byTk[m] && isNum(byTk[m].peer_z)).sort((a, b) => byTk[a].peer_z - byTk[b].peer_z)[0];
+    return '<div class="cl-card" style="--cc:' + col + '">' +
+      '<div class="cl-card-top"><b>' + escapeHtml(cl.id) + '</b><div class="cl-members">' +
+        cl.members.map((m) => '<button type="button" class="cl-member' + (m === cl.leader ? ' lead' : '') + '" data-ticker="' + escapeHtml(m) + '"' + (present.has(m) ? '' : ' disabled') + '>' + escapeHtml(m) + '</button>').join('') +
+      '</div></div>' +
+      '<div class="cl-stats">' +
+        '<div class="stat"><span class="label">Rata² r</span><b>' + fmtNum(cl.avg_r) + '</b></div>' +
+        '<div class="stat"><span class="label">Ret 15m klaster</span><b class="' + pctClass(cl.avg_return_15m) + '">' + fmtPct(cl.avg_return_15m) + '</b></div>' +
+        '<div class="stat"><span class="label">Paling tertinggal</span><b>' + (most ? escapeHtml(most) + ' <span class="' + zClass(byTk[most].peer_z, state.cfg) + '">' + fmtSigned(byTk[most].peer_z) + '</span>' : '-') + '</b></div>' +
+      '</div></div>';
+  }).join('') + (solo.length ? '<div class="cl-card" style="--cc:var(--line)"><div class="cl-card-top"><span class="cl-chip none">solo</span><div class="cl-members">' +
+    solo.map((m) => '<button type="button" class="cl-member" data-ticker="' + escapeHtml(m) + '">' + escapeHtml(m) + '</button>').join('') +
+    '</div></div><div class="calib-hint">Korelasinya dengan saham lain di bawah ambang klaster, jadi tidak punya pembanding klaster.</div></div>' : '');
+
+  // heatmap, diurutkan per klaster
+  const order = [];
+  net.clusters.forEach((cl) => cl.members.forEach((m) => { if (net.tickers.includes(m)) order.push(m); }));
+  net.tickers.forEach((t) => { if (!order.includes(t)) order.push(t); });
+  const ix = (t) => net.tickers.indexOf(t);
+  const cell = (r, self) => {
+    if (self) return '<td class="self" style="background:rgba(63,224,255,.08)">–</td>';
+    if (!isNum(r)) return '<td class="self">·</td>';
+    const a = Math.min(1, Math.abs(r));
+    const bg = r >= 0 ? 'rgba(63,224,255,' + (0.08 + a * 0.62).toFixed(2) + ')' : 'rgba(255,77,106,' + (0.08 + a * 0.62).toFixed(2) + ')';
+    return '<td style="background:' + bg + (a > 0.7 ? ';color:#04080e;font-weight:600' : '') + '">' + r.toFixed(2) + '</td>';
+  };
+  const head = (t) => { const col = clusterColor(byTk[t] && byTk[t].cluster); return '<span' + (col ? ' style="color:' + col + '"' : '') + '>' + escapeHtml(t) + '</span>'; };
+  $('heatmap').innerHTML = '<thead><tr><th></th>' + order.map((t) => '<th>' + head(t) + '</th>').join('') + '</tr></thead><tbody>' +
+    order.map((a) => '<tr><th class="rowh">' + head(a) + '</th>' + order.map((b) => cell((net.matrix[ix(a)] || [])[ix(b)], a === b)).join('') + '</tr>').join('') + '</tbody>';
 }
 
 /* =====================================================================
@@ -1532,7 +1755,11 @@ const FACTORS = [
   { key: 'gap_pct', title: 'Gap pagi saham', buckets: [
     ['Gap turun (< −0,5%)', (v) => v < -0.5], ['Datar (±0,5%)', (v) => Math.abs(v) <= 0.5], ['Gap naik (> +0,5%)', (v) => v > 0.5]] },
   { key: 'atr_pct', title: 'Volatilitas (ATR%)', buckets: [
-    ['Rendah (< 0,25%)', (v) => v < 0.25], ['Sedang (0,25–0,5%)', (v) => v >= 0.25 && v <= 0.5], ['Tinggi (> 0,5%)', (v) => v > 0.5]] }
+    ['Rendah (< 0,25%)', (v) => v < 0.25], ['Sedang (0,25–0,5%)', (v) => v >= 0.25 && v <= 0.5], ['Tinggi (> 0,5%)', (v) => v > 0.5]] },
+  { key: 'peer_z', title: 'Lag vs klaster (z)', buckets: [
+    ['Ikut klaster (> −0,5)', (v) => v > -0.5], ['Sedikit tertinggal (−0,5 s/d −1)', (v) => v <= -0.5 && v > -1], ['Tertinggal klaster (≤ −1)', (v) => v <= -1]] },
+  { key: 'lead_score', title: 'Peran di jaringan', buckets: [
+    ['Pengikut (< −0,05)', (v) => v < -0.05], ['Netral (±0,05)', (v) => Math.abs(v) <= 0.05], ['Pemimpin (> +0,05)', (v) => v > 0.05]] }
 ];
 const FACTOR_MIN_N = 10;
 function factorCard(f, rows) {
@@ -1589,7 +1816,8 @@ function renderHistory() {
 function renderNoData() {
   state.rows = []; state.positions = {};
   nodesDS.clear(); edgesDS.clear();
-  $('signalBody').innerHTML = '<tr class="empty-row"><td colspan="10">Data live belum tersedia. Coba Refresh beberapa saat lagi.</td></tr>';
+  $('signalBody').innerHTML = '<tr class="empty-row"><td colspan="12">Data live belum tersedia. Coba Refresh beberapa saat lagi.</td></tr>';
+  $('clusterList').innerHTML = ''; $('heatmap').innerHTML = ''; $('netMeta').textContent = '';
   $('signalCards').innerHTML = '<div class="muted">Data live belum tersedia.</div>';
   $('signalSummary').innerHTML = ''; $('skippedNote').innerHTML = ''; $('serverCfg').textContent = '';
   $('detailPanel').innerHTML = '<p class="lock-empty">Tidak ada data.</p>';
@@ -1604,6 +1832,7 @@ function renderAll(lockAnimate = false) {
     }
     renderGraph(rows);
     renderSignals(rows);
+    renderNetwork(rows);
     renderLock(rows, lockAnimate);
   } else if (state.mode === 'none') {
     renderNoData();
@@ -1692,8 +1921,10 @@ document.addEventListener('DOMContentLoaded', () => {
   try {
     const prefs = JSON.parse(storeGet(PREF_STORAGE_KEY) || '{}');
     if (typeof prefs.auto === 'boolean') $('autoRefresh').checked = prefs.auto;
+    if (typeof prefs.net === 'boolean') { state.showNet = prefs.net; $('netToggle').checked = prefs.net; }
   } catch (e) { /* abaikan */ }
-  const savePrefs = () => storeSet(PREF_STORAGE_KEY, JSON.stringify({ auto: $('autoRefresh').checked }));
+  const savePrefs = () => storeSet(PREF_STORAGE_KEY, JSON.stringify({ auto: $('autoRefresh').checked, net: $('netToggle').checked }));
+  $('netToggle').addEventListener('change', () => { state.showNet = $('netToggle').checked; savePrefs(); if (state.data) renderGraph(state.rows); });
   $('autoRefresh').addEventListener('change', savePrefs);
   $('sfx').addEventListener('change', () => { if ($('sfx').checked) beep(true); });
 
@@ -1712,6 +1943,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const pick = (e) => { const el = e.target.closest('[data-ticker]'); if (el) selectTicker(el.getAttribute('data-ticker')); };
   $('signalBody').addEventListener('click', pick);
   $('signalCards').addEventListener('click', pick);
+  $('clusterList').addEventListener('click', pick);
 
   setInterval(() => { if ($('autoRefresh').checked && !document.hidden) refreshData(); }, REFRESH_INTERVAL_MS);
   document.addEventListener('visibilitychange', () => {
