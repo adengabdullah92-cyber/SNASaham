@@ -299,6 +299,19 @@ table.hud { width: 100%; border-collapse: collapse; font-variant-numeric: tabula
 .perf-tables { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
 @media (max-width: 900px) { .perf-tables { grid-template-columns: minmax(0, 1fr); } }
 .hud.sm td { padding: 6px 8px; font-size: 12px; }
+.factors-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.factor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 12px; }
+.factor { border: 1px solid var(--line-soft); background: rgba(10, 26, 39, .55); padding: 10px 12px; display: grid; gap: 2px; min-width: 0; }
+.factor h3 { margin: 0 0 4px; font-size: 11px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--gold); }
+.frow { display: grid; grid-template-columns: minmax(0, 1fr) 30px 76px 58px; gap: 8px; align-items: center; font-size: 12px; padding: 4px 0; border-bottom: 1px solid var(--line-soft); }
+.frow:last-of-type { border-bottom: 0; }
+.frow.head { font-size: 9.5px; letter-spacing: .14em; color: var(--muted); text-transform: uppercase; padding-top: 0; }
+.frow .n, .frow .avg { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; }
+.frow.thin { opacity: .45; }
+.wbar { position: relative; height: 15px; background: var(--line-soft); }
+.wbar i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, rgba(63, 224, 255, .35), rgba(63, 224, 255, .75)); }
+.wbar span { position: relative; font-family: var(--font-mono); font-size: 10.5px; padding-left: 4px; line-height: 15px; }
+.factor .miss { font-size: 10.5px; color: var(--muted); margin-top: 2px; }
 .hud.sm th { padding: 5px 8px; }
 .note { font-size: 12px; padding: 8px 10px; border: 1px dashed var(--gold-dim); color: var(--gold); }
 .note.err { border-color: var(--avoid); color: #ffc4cd; }
@@ -508,6 +521,11 @@ footer.disc { font-size: 11.5px; color: var(--muted); max-width: 95ch; }
           </table>
         </div>
       </div>
+      <div class="factors-head">
+        <span class="label">Analisis faktor konteks</span>
+        <span class="calib-hint">Baris pudar = kurang dari 10 sinyal, belum layak disimpulkan. Win = return &gt; 0.</span>
+      </div>
+      <div id="perfFactors" class="factor-grid"></div>
     </div>
   </section>
 
@@ -799,7 +817,9 @@ function normalizePayload(p) {
       beta: optNum(s.beta), return_15m: ret, expected_return: optNum(s.expected_return), lag_gap: optNum(s.lag_gap),
       lag_z: optNum(s.lag_z), resid_sigma_15m: optNum(s.resid_sigma_15m), price: optNum(s.price), volume: optNum(s.volume),
       atr: optNum(s.atr), stop_loss: optNum(s.stop_loss), take_profit: optNum(s.take_profit),
-      sl_method: s.sl_method === 'ATR' || s.sl_method === 'PCT' ? s.sl_method : null
+      sl_method: s.sl_method === 'ATR' || s.sl_method === 'PCT' ? s.sl_method : null,
+      rvol: optNum(s.rvol), vwap_dist_pct: optNum(s.vwap_dist_pct), gap_pct: optNum(s.gap_pct),
+      day_return_pct: optNum(s.day_return_pct), atr_pct: optNum(s.atr_pct)
     };
   });
   let ts = new Date(p.timestamp); if (isNaN(ts.getTime())) ts = new Date();
@@ -809,7 +829,9 @@ function normalizePayload(p) {
     timestamp: ts.toISOString(), generated_at: gen.toISOString(),
     market_open: typeof p.market_open === 'boolean' ? p.market_open : getMarketStatus().open,
     fresh: typeof p.fresh === 'boolean' ? p.fresh : true,
-    benchmark: { ticker: typeof b.ticker === 'string' ? b.ticker.toUpperCase() : BENCHMARK, return_15m: toNum(b.return_15m), price: optNum(b.price), volume: optNum(b.volume) },
+    benchmark: { ticker: typeof b.ticker === 'string' ? b.ticker.toUpperCase() : BENCHMARK, return_15m: toNum(b.return_15m), price: optNum(b.price), volume: optNum(b.volume),
+      vwap_dist_pct: optNum(b.vwap_dist_pct) },
+    minutes_since_open: optNum(p.minutes_since_open),
     stocks,
     skipped: Array.isArray(p.skipped) ? p.skipped.filter((x) => x && typeof x.ticker === 'string').map((x) => ({ ticker: x.ticker, reason: String(x.reason || '') })) : [],
     config: c ? { qqq: optNum(c.qqq_min_return), corr: optNum(c.corr_min), zLag: optNum(c.z_lag), zDiv: optNum(c.z_divergent),
@@ -839,7 +861,9 @@ function mockStock(b, qqq, z) {
   return Object.assign({
     ticker: b.ticker, correlation: rnd(corr, 2), corr_samples: 48, beta: rnd(beta, 3), return_15m: rnd(ret, 4),
     expected_return: rnd(expected, 4), lag_gap: rnd(ret - expected, 4), lag_z: rnd(z, 2), resid_sigma_15m: rnd(sigma, 4),
-    price: rnd(price, 2), volume: Math.round(rand(0.8e6, 9e6)), atr: rnd(atr, 4)
+    price: rnd(price, 2), volume: Math.round(rand(0.8e6, 9e6)), atr: rnd(atr, 4),
+    rvol: rnd(rand(0.5, 2.6), 2), vwap_dist_pct: rnd(rand(-0.4, 0.5), 3), gap_pct: rnd(rand(-1.2, 1.5), 3),
+    day_return_pct: rnd(rand(-1, 1.6), 3), atr_pct: rnd(atr / price * 100, 3)
   }, mockLevels(price, atr));
 }
 function fallbackMockData() {
@@ -865,7 +889,8 @@ function fallbackMockData() {
   const now = new Date().toISOString();
   return normalizePayload({
     timestamp: now, generated_at: now, market_open: getMarketStatus().open, fresh: true,
-    benchmark: { ticker: BENCHMARK, return_15m: rnd(qqq, 2), price: rnd(512 * (1 + rand(-0.005, 0.005)), 2), volume: Math.round(rand(2e6, 6e6)) },
+    benchmark: { ticker: BENCHMARK, return_15m: rnd(qqq, 2), price: rnd(512 * (1 + rand(-0.005, 0.005)), 2), volume: Math.round(rand(2e6, 6e6)), vwap_dist_pct: rnd(rand(-0.3, 0.4), 3) },
+    minutes_since_open: Math.round(rand(20, 370)),
     stocks, skipped: [],
     config: { qqq_min_return: 0.2, corr_min: 0.75, z_lag: 1, z_divergent: 3, sl_atr: 1.5, tp_atr: 2.5, sl_pct: 0.9, tp_pct: 1.5, hold_max_min: 60 }
   });
@@ -883,7 +908,9 @@ function normalizeLog(r) {
     entry_price: optNum(r.entry_price), stop_loss: optNum(r.stop_loss), take_profit: optNum(r.take_profit),
     ai_status: GUARD[status] ? status : 'BYPASSED', ai_reason: String(r.ai_reason || ''),
     blocked: r.blocked === true, alert_sent: r.alert_sent === true, outcome: OUTCOME[oc] ? oc : null,
-    return_pct: optNum(r.return_pct), mfe_pct: optNum(r.mfe_pct), mae_pct: optNum(r.mae_pct), bars_held: optNum(r.bars_held)
+    return_pct: optNum(r.return_pct), mfe_pct: optNum(r.mfe_pct), mae_pct: optNum(r.mae_pct), bars_held: optNum(r.bars_held),
+    rvol: optNum(r.rvol), vwap_dist_pct: optNum(r.vwap_dist_pct), qqq_vwap_dist_pct: optNum(r.qqq_vwap_dist_pct),
+    minutes_since_open: optNum(r.minutes_since_open), gap_pct: optNum(r.gap_pct), day_return_pct: optNum(r.day_return_pct), atr_pct: optNum(r.atr_pct)
   };
 }
 async function fetchSignalHistory() {
@@ -894,7 +921,8 @@ async function fetchSignalHistory() {
   return { rows: json.map(normalizeLog), total: m ? parseInt(m[1], 10) : json.length };
 }
 async function fetchPerformance() {
-  const cols = 'ticker,ai_status,blocked,alert_sent,outcome,return_pct,mfe_pct,mae_pct,bars_held,created_at';
+  const cols = 'ticker,ai_status,blocked,alert_sent,outcome,return_pct,mfe_pct,mae_pct,bars_held,created_at,lag_z,' +
+    'rvol,vwap_dist_pct,qqq_vwap_dist_pct,minutes_since_open,gap_pct,day_return_pct,atr_pct';
   const url = SUPABASE_URL + '/rest/v1/signal_logs?select=' + cols + '&outcome=in.(TP,SL,TIMEOUT)&order=created_at.desc&limit=' + PERF_LIMIT;
   const { json } = await fetchJsonTimeout(url, { method: 'GET', headers: await authHeaders() });
   if (!Array.isArray(json)) throw new Error('Respons kinerja bukan array');
@@ -920,14 +948,16 @@ function mockPerformance() {
   const tickers = ['NVDA', 'AMD', 'TSM', 'META', 'MSFT', 'AMZN', 'SMCI'];
   const statuses = ['PASSED', 'PASSED', 'PASSED', 'NO_NEWS', 'BYPASSED', 'REJECTED'];
   const rows = [];
-  for (let i = 0; i < 26; i++) {
+  for (let i = 0; i < 48; i++) {
     const st = statuses[Math.floor(Math.random() * statuses.length)];
     const d = Math.random();
     const oc = d < 0.44 ? 'TP' : (d < 0.78 ? 'SL' : 'TIMEOUT');
     const ret = oc === 'TP' ? rand(0.5, 1.0) : (oc === 'SL' ? -rand(0.3, 0.6) : rand(-0.3, 0.4));
     rows.push(normalizeLog({ ticker: tickers[i % tickers.length], ai_status: st, blocked: st === 'REJECTED', alert_sent: st !== 'REJECTED',
       outcome: oc, return_pct: rnd(ret, 3), mfe_pct: rnd(Math.max(ret, 0) + rand(0, 0.3), 3), mae_pct: rnd(Math.min(ret, 0) - rand(0, 0.3), 3),
-      bars_held: Math.round(rand(1, 12)), created_at: new Date(Date.now() - i * 3600000).toISOString() }));
+      bars_held: Math.round(rand(1, 12)), created_at: new Date(Date.now() - i * 3600000).toISOString(),
+      lag_z: rnd(rand(-2.8, -1.0), 2), rvol: rnd(rand(0.4, 2.8), 2), vwap_dist_pct: rnd(rand(-0.5, 0.5), 3), qqq_vwap_dist_pct: rnd(rand(-0.4, 0.4), 3),
+      minutes_since_open: Math.round(rand(5, 385)), gap_pct: i % 7 === 0 ? null : rnd(rand(-1.5, 1.5), 3), day_return_pct: rnd(rand(-1, 1.5), 3), atr_pct: rnd(rand(0.12, 0.7), 3) }));
   }
   return rows;
 }
@@ -1388,6 +1418,14 @@ function renderLock(rows, animate) {
         '<div class="stat"><span class="label">Ekspektasi</span><b class="' + pctClass(s.expected_return) + '">' + fmtPct(s.expected_return) + '</b><small><span class="nc">β</span> × QQQ ' + fmtPct(bench.return_15m) + '</small></div>' +
         '<div class="stat"><span class="label">Selisih</span><b class="' + pctClass(s.lag_gap) + '">' + fmtPct(s.lag_gap) + '</b></div>' +
       '</div>' +
+      '<div><div class="label" style="margin-bottom:6px">Konteks <span class="nc">· dicatat, belum jadi filter</span></div><div class="statgrid">' +
+        '<div class="stat"><span class="label">RVOL</span><b>' + (isNum(s.rvol) ? s.rvol.toFixed(2) + '×' : '-') + '</b><small>vs 24 bar sblm</small></div>' +
+        '<div class="stat"><span class="label">vs VWAP</span><b class="' + pctClass(s.vwap_dist_pct) + '">' + fmtPct(s.vwap_dist_pct) + '</b></div>' +
+        '<div class="stat"><span class="label">QQQ vs VWAP</span><b class="' + pctClass(bench.vwap_dist_pct) + '">' + fmtPct(bench.vwap_dist_pct) + '</b></div>' +
+        '<div class="stat"><span class="label">Gap pagi</span><b class="' + pctClass(s.gap_pct) + '">' + fmtPct(s.gap_pct) + '</b></div>' +
+        '<div class="stat"><span class="label">Sejak open</span><b class="' + pctClass(s.day_return_pct) + '">' + fmtPct(s.day_return_pct) + '</b></div>' +
+        '<div class="stat"><span class="label">Menit sesi</span><b>' + (isNum(state.data.minutes_since_open) ? state.data.minutes_since_open : '-') + '</b><small>sejak 09:30 ET</small></div>' +
+      '</div></div>' +
       ladder +
       '<p class="explain">' + escapeHtml(explainSignal(s, bench, cfg, s.signal)) + '</p>' +
       (s.signal === 'BUY_LAGGING' ? '<div class="explain-note">Level SL/TP hanya ilustrasi, bukan rekomendasi.</div>' : '') +
@@ -1453,7 +1491,7 @@ function equityHtml(rows) {
 function renderPerformance() {
   const p = state.perf;
   $('perfMode').textContent = p.mode === 'simulation' ? 'SIMULASI · bukan hasil nyata' : 'sinyal tertutup · belum termasuk komisi & slippage';
-  const clear = () => { $('perfTop').innerHTML = ''; $('perfEquity').innerHTML = ''; $('perfGroups').innerHTML = ''; $('perfTickers').innerHTML = ''; };
+  const clear = () => { $('perfTop').innerHTML = ''; $('perfEquity').innerHTML = ''; $('perfGroups').innerHTML = ''; $('perfTickers').innerHTML = ''; $('perfFactors').innerHTML = ''; };
   if (p.error) { $('perfWarn').innerHTML = '<div class="note err">Gagal membaca data kinerja: ' + escapeHtml(p.error) + '. Jika kolom outcome belum ada, jalankan migration_v3.sql.</div>'; clear(); return; }
   const all = aggregate(p.rows);
   if (!all) { $('perfWarn').innerHTML = '<div class="note">Belum ada sinyal yang tertutup. Statistik muncul setelah sinyal pertama kena TP, SL, atau batas waktu.</div>'; clear(); return; }
@@ -1475,6 +1513,41 @@ function renderPerformance() {
   const tickers = Array.from(new Set(p.rows.map((r) => r.ticker)));
   $('perfTickers').innerHTML = tickers.map((t) => ({ t, a: by((r) => r.ticker === t) })).sort((x, y) => y.a.n - x.a.n || y.a.avg - x.a.avg)
     .map((x) => perfRow('<b>' + escapeHtml(x.t) + '</b>', x.a)).join('');
+  $('perfFactors').innerHTML = FACTORS.map((f) => factorCard(f, p.rows)).join('');
+}
+
+// Faktor konteks yang dicatat di setiap sinyal (v5). Pembagian kelompok sengaja kasar supaya tiap kelompok
+// cepat terisi; bila datanya sudah banyak, batasnya bisa dipersempit.
+const FACTORS = [
+  { key: 'rvol', title: 'Volume relatif (RVOL)', buckets: [
+    ['Sepi (< 0,8×)', (v) => v < 0.8], ['Normal (0,8–1,5×)', (v) => v >= 0.8 && v <= 1.5], ['Ramai (> 1,5×)', (v) => v > 1.5]] },
+  { key: 'vwap_dist_pct', title: 'Saham vs VWAP', buckets: [
+    ['Di bawah (< −0,1%)', (v) => v < -0.1], ['Dekat (±0,1%)', (v) => Math.abs(v) <= 0.1], ['Di atas (> +0,1%)', (v) => v > 0.1]] },
+  { key: 'qqq_vwap_dist_pct', title: 'QQQ vs VWAP', buckets: [
+    ['QQQ di bawah VWAP', (v) => v < 0], ['QQQ di atas VWAP', (v) => v >= 0]] },
+  { key: 'minutes_since_open', title: 'Waktu sesi', buckets: [
+    ['Pembukaan (0–30 mnt)', (v) => v < 30], ['Pagi (30–120)', (v) => v >= 30 && v < 120], ['Siang (120–300)', (v) => v >= 120 && v < 300], ['Jelang tutup (300+)', (v) => v >= 300]] },
+  { key: 'lag_z', title: 'Kedalaman lag (z)', buckets: [
+    ['Dangkal (> −1,5)', (v) => v > -1.5], ['Sedang (−1,5 s/d −2)', (v) => v <= -1.5 && v > -2], ['Dalam (≤ −2)', (v) => v <= -2]] },
+  { key: 'gap_pct', title: 'Gap pagi saham', buckets: [
+    ['Gap turun (< −0,5%)', (v) => v < -0.5], ['Datar (±0,5%)', (v) => Math.abs(v) <= 0.5], ['Gap naik (> +0,5%)', (v) => v > 0.5]] },
+  { key: 'atr_pct', title: 'Volatilitas (ATR%)', buckets: [
+    ['Rendah (< 0,25%)', (v) => v < 0.25], ['Sedang (0,25–0,5%)', (v) => v >= 0.25 && v <= 0.5], ['Tinggi (> 0,5%)', (v) => v > 0.5]] }
+];
+const FACTOR_MIN_N = 10;
+function factorCard(f, rows) {
+  const withVal = rows.filter((r) => isNum(r[f.key]));
+  const missing = rows.length - withVal.length;
+  const body = f.buckets.map(([label, pred]) => {
+    const a = aggregate(withVal.filter((r) => pred(r[f.key])));
+    if (!a) return '<div class="frow thin"><span>' + label + '</span><span class="n">0</span><span class="wbar"><span>-</span></span><span class="avg">-</span></div>';
+    return '<div class="frow' + (a.n < FACTOR_MIN_N ? ' thin' : '') + '"><span>' + label + '</span><span class="n">' + a.n + '</span>' +
+      '<span class="wbar"><i style="width:' + a.win.toFixed(0) + '%"></i><span>' + a.win.toFixed(0) + '%</span></span>' +
+      '<span class="avg ' + pctClass(a.avg) + '">' + fmtPct(a.avg) + '</span></div>';
+  }).join('');
+  return '<div class="factor"><h3>' + f.title + '</h3>' +
+    '<div class="frow head"><span>Kelompok</span><span class="n">N</span><span>Win</span><span class="avg">Rata²</span></div>' + body +
+    (missing ? '<div class="miss">' + missing + ' sinyal tanpa data faktor ini (sinyal lama atau data belum cukup)</div>' : '') + '</div>';
 }
 
 /* =====================================================================
