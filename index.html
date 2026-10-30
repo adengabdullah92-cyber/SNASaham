@@ -115,6 +115,12 @@ button, input { font: inherit; color: inherit; }
 .login-msg { min-height: 1.4em; font-size: 12.5px; color: var(--muted); text-align: center; }
 .login-msg.err { color: #ffc4cd; }
 .login-msg.ok { color: var(--mom); }
+button.pill { cursor: pointer; color: inherit; }
+button.pill:hover { border-color: var(--cyan); }
+.tg-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding-top: 10px; border-top: 1px solid var(--line-soft); }
+.tg-row .label { margin-right: 4px; }
+#tgResult { font-size: 12px; color: var(--muted); }
+#tgResult.ok { color: var(--mom); } #tgResult.err { color: #ffc4cd; }
 .user-pill { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 560px) { .user-pill { display: none !important; } }
 
@@ -474,6 +480,7 @@ footer.disc { font-size: 11.5px; color: var(--muted); max-width: 95ch; }
       <span id="pillLive" class="pill dim"><i></i><span>MEMUAT</span></span>
       <span id="pillMarket" class="pill dim"><i></i><span>PASAR</span></span>
       <span id="pillAge" class="pill dim"><i></i><span class="mono">DATA -</span></span>
+      <button id="pillTg" class="pill dim" type="button" title="Status Telegram. Ketuk untuk membuka tes Telegram."><i></i><span>TELEGRAM</span></button>
       <span class="clock"><small>NY</small><b id="clkNy">--:--</b></span>
       <span class="clock"><small>WIB</small><b id="clkWib">--:--:--</b></span>
       <label class="toggle" for="autoRefresh"><input type="checkbox" id="autoRefresh" checked><span></span>AUTO 60S</label>
@@ -609,6 +616,11 @@ footer.disc { font-size: 11.5px; color: var(--muted); max-width: 95ch; }
       <div class="calib-foot">
         <button id="btnResetCfg" class="btn-mini" type="button">Reset default</button>
         <span>Slider hanya mengubah tampilan di perangkat ini. Alert Telegram dan log memakai threshold server.</span>
+      </div>
+      <div class="tg-row">
+        <span class="label">Telegram</span>
+        <button id="btnTgTest" class="btn-mini" type="button">Kirim pesan tes</button>
+        <span id="tgResult" role="status" aria-live="polite">Kirim pesan tes untuk memastikan bot dan chat ID tersambung.</span>
       </div>
       </div>
       <div id="serverCfg" class="calib-hint mono"></div>
@@ -794,16 +806,22 @@ async function fetchJsonTimeout(url, init) {
 /* =====================================================================
  *  WAKTU
  * ===================================================================== */
+// Libur & tutup lebih awal diambil dari kalender server (mode READ) bila tersedia.
 function getMarketStatus(now = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(now);
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(now);
   const get = (t) => parts.find((p) => p.type === t).value;
   const wd = get('weekday');
   let h = parseInt(get('hour'), 10);
   if (h === 24) h = 0;
   const m = parseInt(get('minute'), 10);
   const mins = h * 60 + m;
-  const open = wd !== 'Sat' && wd !== 'Sun' && mins >= 9 * 60 + 30 && mins < 16 * 60;
-  return { open, nyTime: String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') };
+  const day = get('year') + '-' + get('month') + '-' + get('day');
+  const cal = state && state.data && state.data.calendar;
+  const holiday = !!(cal && cal.holidays.includes(day));
+  const early = !!(cal && cal.early_closes.includes(day));
+  const closeMin = early ? 13 * 60 : 16 * 60;
+  const open = wd !== 'Sat' && wd !== 'Sun' && !holiday && mins >= 9 * 60 + 30 && mins < closeMin;
+  return { open, holiday, early, nyTime: String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') };
 }
 function fmtWibTime(date, withSeconds = true) {
   return new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', second: withSeconds ? '2-digit' : undefined, hour12: false })
@@ -906,6 +924,11 @@ function normalizePayload(p) {
       spark_start: typeof b.spark_start === 'string' && !isNaN(Date.parse(b.spark_start)) ? b.spark_start : null },
     minutes_since_open: optNum(p.minutes_since_open),
     network: normalizeNetwork(p.network),
+    telegram: p.telegram && typeof p.telegram === 'object' ? { configured: p.telegram.configured === true, daily_recap: p.telegram.daily_recap !== false } : null,
+    calendar: p.calendar && typeof p.calendar === 'object' ? {
+      holidays: Array.isArray(p.calendar.holidays) ? p.calendar.holidays.filter((d) => typeof d === 'string') : [],
+      early_closes: Array.isArray(p.calendar.early_closes) ? p.calendar.early_closes.filter((d) => typeof d === 'string') : []
+    } : null,
     stocks,
     skipped: Array.isArray(p.skipped) ? p.skipped.filter((x) => x && typeof x.ticker === 'string').map((x) => ({ ticker: x.ticker, reason: String(x.reason || '') })) : [],
     config: c ? { qqq: optNum(c.qqq_min_return), corr: optNum(c.corr_min), zLag: optNum(c.z_lag), zDiv: optNum(c.z_divergent),
@@ -1234,7 +1257,10 @@ function updateStatusBar() {
   const market = getMarketStatus(now);
   $('clkNy').textContent = market.nyTime;
   $('clkWib').textContent = fmtWibTime(now);
-  setPill('pillMarket', market.open ? 'ok' : 'dim', market.open ? 'Pasar buka' : 'Pasar tutup');
+  setPill('pillMarket', market.open ? 'ok' : 'dim', market.holiday ? 'Libur bursa' : market.open ? (market.early ? 'Buka · tutup 13:00' : 'Pasar buka') : 'Pasar tutup');
+  const tg = state.data && state.data.telegram;
+  if (state.mode !== 'live' || !tg) setPill('pillTg', 'dim', 'Telegram');
+  else setPill('pillTg', tg.configured ? 'ok' : 'bad', tg.configured ? 'Telegram' : 'Telegram belum diset');
   if (!state.data) {
     setPill('pillLive', state.mode === 'none' ? 'bad' : 'dim', state.mode === 'none' ? 'Tidak ada data' : 'Memuat');
     setPill('pillAge', 'dim', 'DATA -');
@@ -2023,6 +2049,11 @@ document.addEventListener('DOMContentLoaded', () => {
     $('btnCalib').setAttribute('aria-expanded', String(open));
   });
   $('btnResetView').addEventListener('click', () => { userMovedView = false; fitRadar(); });
+  $('btnTgTest').addEventListener('click', testTelegram);
+  $('pillTg').addEventListener('click', () => {
+    if ($('calibBody').hidden) $('btnCalib').click();
+    $('calibPanel').scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' });
+  });
   const pick = (e) => { const el = e.target.closest('[data-ticker]'); if (el) selectTicker(el.getAttribute('data-ticker')); };
   $('signalBody').addEventListener('click', pick);
   $('signalCards').addEventListener('click', pick);
@@ -2159,6 +2190,19 @@ async function onLoginSubmit(e) {
     } catch (err) { setLoginMsg('Gagal memeriksa kode: ' + ((err && err.message) || err), 'err'); }
     finally { btn.disabled = false; }
   }
+}
+// Tes Telegram lewat Edge Function (?mode=test-telegram). Server memeriksa login + allowlist.
+async function testTelegram() {
+  const out = $('tgResult'), btn = $('btnTgTest');
+  if (!isUrlConfigured()) { out.className = ''; out.textContent = 'Mode demo: pesan tes tidak dikirim.'; return; }
+  btn.disabled = true; out.className = ''; out.textContent = 'Mengirim…';
+  try {
+    const { json } = await fetchJsonTimeout(SUPABASE_FUNCTION_URL + '?mode=test-telegram', { method: 'GET', headers: await authHeaders() });
+    if (json.ok) { out.className = 'ok'; out.textContent = 'Terkirim. Cek chat Telegram Anda.'; }
+    else { out.className = 'err'; out.textContent = 'Gagal: ' + (json.error || 'tidak diketahui') + (json.configured === false ? '. Set secret TELEGRAM_TOKEN dan TELEGRAM_CHAT_ID di Supabase.' : ''); }
+  } catch (e) {
+    out.className = 'err'; out.textContent = 'Gagal menghubungi server: ' + e.message;
+  } finally { btn.disabled = false; }
 }
 async function signOutAndReload() {
   try { if (sb) await sb.auth.signOut(); } catch (e) { /* abaikan */ }
