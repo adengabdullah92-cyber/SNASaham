@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
 <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <style>
 /* Layout: bar komando → [radar korelasi | target lock] → papan sinyal → kinerja → log misi → kalibrasi.
    Tampilan sengaja satu tema (gelap): HUD hologram cyan dengan aksen emas. */
@@ -37,6 +38,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }   /* atribut hidden harus menang atas display:grid/flex komponen */
 html, body { min-height: 100%; }
 body {
   margin: 0;
@@ -99,6 +101,22 @@ button, input { font: inherit; color: inherit; }
 .boot-bar { width: 100%; height: 3px; background: var(--line-soft); overflow: hidden; }
 .boot-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--cyan), var(--gold)); box-shadow: 0 0 10px var(--cyan); transition: width .25s ease; }
 .boot-skip { font-size: 11px; letter-spacing: .2em; color: var(--muted); text-transform: uppercase; }
+
+/* ---------- LOGIN ---------- */
+.login { cursor: default; z-index: 110; }
+.login-sub { font-size: 11px; letter-spacing: .26em; color: var(--gold); text-transform: uppercase; }
+.login-step { width: 100%; display: grid; gap: 10px; text-align: left; }
+.hud-input { width: 100%; height: 44px; padding: 0 12px; background: rgba(7, 18, 28, .9); border: 1px solid var(--line); color: var(--text); font-size: 16px; border-radius: 0; }
+.hud-input:focus { outline: none; border-color: var(--cyan); box-shadow: 0 0 0 1px var(--cyan), 0 0 16px rgba(63, 224, 255, .3); }
+.hud-input.mono { letter-spacing: .4em; font-size: 20px; text-align: center; }
+.login .btn-hud { height: 42px; width: 100%; }
+.login-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.login-hint { font-size: 11.5px; color: var(--muted); }
+.login-msg { min-height: 1.4em; font-size: 12.5px; color: var(--muted); text-align: center; }
+.login-msg.err { color: #ffc4cd; }
+.login-msg.ok { color: var(--mom); }
+.user-pill { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 560px) { .user-pill { display: none !important; } }
 
 /* ---------- BAR KOMANDO ---------- */
 .cmdbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 50; background: rgba(4, 8, 14, .88); border-bottom: 1px solid var(--line);
@@ -354,6 +372,37 @@ footer.disc { font-size: 11.5px; color: var(--muted); max-width: 95ch; }
   </div>
 </div>
 
+<!-- ========== LOGIN ========== -->
+<div id="login" class="boot login" hidden>
+  <form id="loginForm" class="boot-inner" novalidate>
+    <svg class="boot-core" viewBox="0 0 132 132" aria-hidden="true" style="width:96px;height:96px">
+      <circle cx="66" cy="66" r="62" fill="none" stroke="rgba(63,224,255,.18)" stroke-width="1"/>
+      <g class="r1"><circle cx="66" cy="66" r="52" fill="none" stroke="#3fe0ff" stroke-width="3" stroke-dasharray="40 14"/></g>
+      <g class="r2"><circle cx="66" cy="66" r="40" fill="none" stroke="#e8c170" stroke-width="2" stroke-dasharray="6 8"/></g>
+      <circle cx="66" cy="66" r="22" fill="rgba(63,224,255,.15)" stroke="#3fe0ff" stroke-width="1.5"/>
+      <circle cx="66" cy="66" r="7" fill="#d6f4ff"/>
+    </svg>
+    <div class="boot-title">STOCK SNA <span>//</span> DSS</div>
+    <div class="login-sub">Akses terbatas · login diperlukan</div>
+    <div id="stepEmail" class="login-step">
+      <label for="loginEmail" class="label">Email terdaftar</label>
+      <input id="loginEmail" name="email" type="email" class="hud-input" autocomplete="email" inputmode="email" autocapitalize="off" spellcheck="false" placeholder="nama@email.com">
+      <button id="btnSend" class="btn-hud" type="submit">Kirim kode akses</button>
+    </div>
+    <div id="stepCode" class="login-step" hidden>
+      <label for="loginCode" class="label">Kode dari email <span id="codeEmail" class="nc gold"></span></label>
+      <input id="loginCode" name="code" type="text" class="hud-input mono" autocomplete="one-time-code" inputmode="numeric" maxlength="10" placeholder="••••••">
+      <button id="btnVerify" class="btn-hud" type="submit">Masuk</button>
+      <div class="login-row">
+        <button id="btnBack" class="btn-mini" type="button">Ganti email</button>
+        <button id="btnResend" class="btn-mini" type="button">Kirim ulang kode</button>
+      </div>
+      <div class="login-hint">Bisa juga dengan mengetuk tautan di email itu, asalkan dibuka di browser yang sama dengan halaman ini.</div>
+    </div>
+    <div id="loginMsg" class="login-msg" role="status" aria-live="polite"></div>
+  </form>
+</div>
+
 <!-- ========== BAR KOMANDO ========== -->
 <header class="cmdbar">
   <div class="cmdbar-inner">
@@ -378,6 +427,8 @@ footer.disc { font-size: 11.5px; color: var(--muted); max-width: 95ch; }
       <label class="toggle" for="autoRefresh"><input type="checkbox" id="autoRefresh" checked><span></span>AUTO 60S</label>
       <label class="toggle" for="sfx"><input type="checkbox" id="sfx"><span></span>SUARA</label>
       <button id="btnRefresh" class="btn-hud" type="button"><span id="btnLabel">Refresh</span></button>
+      <span id="userPill" class="pill dim user-pill" hidden><i></i><span class="nc"></span></span>
+      <button id="btnLogout" class="btn-mini" type="button" hidden>Keluar</button>
     </div>
   </div>
 </header>
@@ -506,6 +557,8 @@ const SUPABASE_URL = 'https://hwezplmtngqbblhdaxio.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_4SkHZOtDBWLDxrZQvG-kCA_YvCEsYu2';
 // true = paksa mode demo (data simulasi) walau URL sudah diisi. Untuk pratinjau tampilan.
 const DEMO_MODE = false;
+// true = dashboard wajib login Supabase Auth (email terdaftar di tabel dashboard_allowlist).
+const AUTH_REQUIRED = true;
 
 const BENCHMARK = 'QQQ';
 const REFRESH_INTERVAL_MS = 60000;   // auto refresh (hanya membaca snapshot, tidak memakai kredit API data)
@@ -550,8 +603,9 @@ const state = {
   history: { rows: [], total: null, mode: 'simulation', error: null },
   perf: { rows: [], mode: 'simulation', error: null },
   rows: [], positions: {}, prevSignals: null, acquire: {}, prevVals: {},
-  booting: false, pendingAcquire: false
+  booting: false, pendingAcquire: false, appStarted: false
 };
+let sb = null;            // klien Supabase Auth (hanya jika login diwajibkan)
 let network = null, nodesDS = null, edgesDS = null, userMovedView = false;
 
 /* =====================================================================
@@ -612,9 +666,19 @@ function isPlaceholder(s) { return typeof s !== 'string' || !s.startsWith('http'
 function isUrlConfigured() { return !DEMO_MODE && !isPlaceholder(SUPABASE_FUNCTION_URL); }
 function isAnonKeyConfigured() { return typeof SUPABASE_ANON_KEY === 'string' && SUPABASE_ANON_KEY.length > 20 && !SUPABASE_ANON_KEY.includes('YOUR_'); }
 function isDbConfigured() { return !DEMO_MODE && !isPlaceholder(SUPABASE_URL) && isAnonKeyConfigured(); }
-function authHeaders() {
+function authEnabled() { return AUTH_REQUIRED && !DEMO_MODE && isDbConfigured(); }
+async function getAccessToken() {
+  if (!sb) return null;
+  try { const { data } = await sb.auth.getSession(); return data && data.session ? data.session.access_token : null; } catch (e) { return null; }
+}
+// Saat login diwajibkan, Authorization berisi access token pengguna (bukan anon key),
+// sehingga RLS dan Edge Function bisa memeriksa email pengguna.
+async function authHeaders() {
   const h = { 'Accept': 'application/json' };
-  if (isAnonKeyConfigured()) { h['Authorization'] = 'Bearer ' + SUPABASE_ANON_KEY; h['apikey'] = SUPABASE_ANON_KEY; }
+  if (isAnonKeyConfigured()) h['apikey'] = SUPABASE_ANON_KEY;
+  const tok = await getAccessToken();
+  if (tok) h['Authorization'] = 'Bearer ' + tok;
+  else if (!authEnabled() && isAnonKeyConfigured()) h['Authorization'] = 'Bearer ' + SUPABASE_ANON_KEY;
   return h;
 }
 
@@ -626,7 +690,9 @@ async function fetchJsonTimeout(url, init) {
     if (!res.ok) {
       let detail = '';
       try { const j = await res.clone().json(); detail = j.error || j.message || ''; } catch (e) { /* abaikan */ }
-      throw new Error('HTTP ' + res.status + (detail ? ': ' + detail : ''));
+      const err = new Error('HTTP ' + res.status + (detail ? ': ' + detail : ''));
+      err.status = res.status;
+      throw err;
     }
     return { res, json: await res.json() };
   } catch (e) {
@@ -748,7 +814,7 @@ function normalizePayload(p) {
   };
 }
 async function fetchLiveDataFromSupabase() {
-  const { json } = await fetchJsonTimeout(SUPABASE_FUNCTION_URL, { method: 'GET', headers: authHeaders() });
+  const { json } = await fetchJsonTimeout(SUPABASE_FUNCTION_URL, { method: 'GET', headers: await authHeaders() });
   return normalizePayload(json);
 }
 
@@ -819,7 +885,7 @@ function normalizeLog(r) {
 }
 async function fetchSignalHistory() {
   const url = SUPABASE_URL + '/rest/v1/signal_logs?select=*&order=created_at.desc&limit=' + HISTORY_LIMIT;
-  const { res, json } = await fetchJsonTimeout(url, { method: 'GET', headers: Object.assign(authHeaders(), { 'Prefer': 'count=exact' }) });
+  const { res, json } = await fetchJsonTimeout(url, { method: 'GET', headers: Object.assign(await authHeaders(), { 'Prefer': 'count=exact' }) });
   if (!Array.isArray(json)) throw new Error('Respons riwayat bukan array');
   const m = /\/(\d+)$/.exec(res.headers.get('content-range') || '');
   return { rows: json.map(normalizeLog), total: m ? parseInt(m[1], 10) : json.length };
@@ -827,7 +893,7 @@ async function fetchSignalHistory() {
 async function fetchPerformance() {
   const cols = 'ticker,ai_status,blocked,alert_sent,outcome,return_pct,mfe_pct,mae_pct,bars_held,created_at';
   const url = SUPABASE_URL + '/rest/v1/signal_logs?select=' + cols + '&outcome=in.(TP,SL,TIMEOUT)&order=created_at.desc&limit=' + PERF_LIMIT;
-  const { json } = await fetchJsonTimeout(url, { method: 'GET', headers: authHeaders() });
+  const { json } = await fetchJsonTimeout(url, { method: 'GET', headers: await authHeaders() });
   if (!Array.isArray(json)) throw new Error('Respons kinerja bukan array');
   return json.map(normalizeLog).filter((r) => isNum(r.return_pct));
 }
@@ -921,6 +987,17 @@ async function refreshSnapshot() {
     return true;
   } catch (e) {
     state.liveError = e.message;
+    if (authEnabled() && e.status === 401) {
+      // token tidak bisa diperbarui lagi: kembali ke layar login
+      showAlert('Sesi login berakhir. Silakan masuk lagi.');
+      setTimeout(signOutAndReload, 1500);
+      return false;
+    }
+    if (authEnabled() && e.status === 403) {
+      state.data = null; state.mode = 'none';
+      showAlert(e.message.replace(/^HTTP 403: /, '') + ' Minta pemilik dashboard menambahkan email Anda, atau keluar dan masuk dengan email lain.');
+      return false;
+    }
     if (state.mode === 'live' && state.data) {
       showAlert('Gagal refresh data live (' + e.message + '). Yang tampil adalah snapshot terakhir dari ' + fmtWibTime(new Date(state.data.generated_at)) + ' WIB, jangan dipakai sebagai sinyal terkini.');
     } else {
@@ -942,7 +1019,7 @@ async function refreshHistory() {
   state.perf = p.status === 'fulfilled' ? { rows: p.value, mode: 'live', error: null } : { rows: [], mode: 'live', error: p.reason.message };
 }
 async function refreshData() {
-  if (state.loading) return;
+  if (state.loading || !state.appStarted) return;
   setLoading(true);
   try {
     const [fresh] = await Promise.all([refreshSnapshot(), refreshHistory()]);
@@ -1520,6 +1597,7 @@ function runBoot(dataPromise) {
       line('INISIALISASI INTI HUD', 'OK'); bar.style.width = '18%'; await sleep(230);
       line('KALIBRASI RADAR KORELASI', 'OK'); bar.style.width = '36%'; await sleep(230);
       line(DEMO_MODE || !isUrlConfigured() ? 'MODE DEMO' : 'TAUTAN SUPABASE / dss-sna', 'OK'); bar.style.width = '52%';
+      if (authEnabled()) { line('OTORISASI PENGGUNA', 'OK'); await sleep(200); }
       const ok = await Promise.race([dataPromise.then(() => true, () => false), new Promise((r) => setTimeout(() => r(null), 4000))]);
       const st = state.mode === 'live' ? 'LIVE' : state.mode === 'simulation' ? 'SIMULASI' : 'GAGAL';
       line('MEMUAT SNAPSHOT PASAR', ok === null ? 'TERTUNDA' : st, st === 'GAGAL' || ok === null ? 'warn' : ''); bar.style.width = '74%'; await sleep(230);
@@ -1566,13 +1644,111 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(updateStatusBar, 1000);
   updateStatusBar();
 
+  $('loginForm').addEventListener('submit', onLoginSubmit);
+  $('btnBack').addEventListener('click', () => setLoginStep('email'));
+  $('btnResend').addEventListener('click', () => { setLoginStep('email'); onLoginSubmit(new Event('submit')); });
+  $('btnLogout').addEventListener('click', signOutAndReload);
+
+  initAuth();
+});
+
+/* =====================================================================
+ *  LOGIN (Supabase Auth: kode OTP lewat email, atau tautan magic link)
+ * ===================================================================== */
+function startApp() {
+  if (state.appStarted) return;
+  state.appStarted = true;
   const first = refreshData();
   runBoot(first).then(() => {
     $('main').classList.add('reveal');
     if (state.pendingAcquire) { state.pendingAcquire = false; detectAcquisitions(); }
     fitRadar();
   });
-});
+}
+
+async function initAuth() {
+  if (!authEnabled()) { startApp(); return; }
+  if (!window.supabase || !window.supabase.createClient) {
+    state.mode = 'none'; updateStatusBar();
+    showAlert('Library login Supabase gagal dimuat. Periksa koneksi internet lalu muat ulang halaman.');
+    return;
+  }
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+  });
+  sb.auth.onAuthStateChange((event, session) => {
+    // jangan memanggil fungsi Supabase lain langsung di dalam callback ini
+    if (session && !state.appStarted) setTimeout(() => enterApp(session), 0);
+    if (event === 'SIGNED_OUT' && state.appStarted) setTimeout(() => location.reload(), 0);
+  });
+  let session = null;
+  try { const { data } = await sb.auth.getSession(); session = data.session; } catch (e) { /* abaikan */ }
+  if (session) enterApp(session); else showLogin();
+}
+
+function enterApp(session) {
+  if (state.appStarted) return;
+  $('login').hidden = true;
+  const email = session && session.user ? session.user.email : '';
+  if (email) { const up = $('userPill'); up.lastElementChild.textContent = email; up.hidden = false; }
+  $('btnLogout').hidden = false;
+  startApp();
+}
+
+let loginEmail = '';
+function showLogin() {
+  $('login').hidden = false;
+  setLoginStep('email');
+  setTimeout(() => $('loginEmail').focus(), 50);
+}
+function setLoginStep(step) {
+  $('stepEmail').hidden = step !== 'email';
+  $('stepCode').hidden = step !== 'code';
+  setLoginMsg('');
+  if (step === 'code') { $('codeEmail').textContent = loginEmail; $('loginCode').value = ''; setTimeout(() => $('loginCode').focus(), 50); }
+}
+function setLoginMsg(text, cls = '') { const m = $('loginMsg'); m.className = 'login-msg ' + cls; m.textContent = text; }
+function otpErrorText(err) {
+  const m = String((err && err.message) || err || '');
+  if (/signups not allowed|not allowed for otp|user not found|not found/i.test(m)) return 'Email ini belum terdaftar sebagai pengguna dashboard.';
+  if (/rate limit|too many|security purposes|seconds/i.test(m)) return 'Terlalu banyak permintaan kode. Tunggu sekitar satu menit lalu coba lagi.';
+  return 'Gagal mengirim kode: ' + m;
+}
+async function onLoginSubmit(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  if (!sb) return;
+  const sending = !$('stepEmail').hidden;
+  const btn = sending ? $('btnSend') : $('btnVerify');
+  if (btn.disabled) return;
+  if (sending) {
+    const email = $('loginEmail').value.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { setLoginMsg('Format email belum benar.', 'err'); return; }
+    btn.disabled = true; setLoginMsg('Mengirim kode…');
+    try {
+      const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: location.origin + location.pathname } });
+      if (error) { setLoginMsg(otpErrorText(error), 'err'); return; }
+      loginEmail = email;
+      setLoginStep('code');
+      setLoginMsg('Kode terkirim. Cek kotak masuk dan folder spam.', 'ok');
+    } catch (err) { setLoginMsg(otpErrorText(err), 'err'); }
+    finally { btn.disabled = false; }
+  } else {
+    const token = $('loginCode').value.replace(/\s+/g, '');
+    if (!/^\d{6,10}$/.test(token)) { setLoginMsg('Masukkan kode angka dari email.', 'err'); return; }
+    btn.disabled = true; setLoginMsg('Memeriksa kode…');
+    try {
+      const { data, error } = await sb.auth.verifyOtp({ email: loginEmail, token, type: 'email' });
+      if (error) { setLoginMsg('Kode salah atau sudah kedaluwarsa. Kirim ulang kode lalu coba lagi.', 'err'); return; }
+      setLoginMsg('Akses diterima.', 'ok');
+      if (data && data.session) enterApp(data.session);
+    } catch (err) { setLoginMsg('Gagal memeriksa kode: ' + ((err && err.message) || err), 'err'); }
+    finally { btn.disabled = false; }
+  }
+}
+async function signOutAndReload() {
+  try { if (sb) await sb.auth.signOut(); } catch (e) { /* abaikan */ }
+  location.reload();
+}
 </script>
 </body>
 </html>
